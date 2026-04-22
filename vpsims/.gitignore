@@ -1,0 +1,34 @@
+# .NET Core ignore rules
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Environment Files
+.env
+.env.local
+.env.*
+!.env.example
+
+# Secrets (Keep appsettings.json for defaults, but ignore sensitive local ones)
+appsettings.Development.json
+appsettings.Local.json
+
+# Documentation
+*.md
+!README.md
+
+# Visual Studio files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS files
+.DS_Store
+Thumbs.db

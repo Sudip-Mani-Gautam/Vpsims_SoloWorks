@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Core Surfaces ── */
+    --background:       0 0% 96%;
+    --foreground:       222 25% 12%;
+
+    --card:             0 0% 100%;
+    --card-foreground:  222 25% 12%;
+
+    --popover:          0 0% 100%;
+    --popover-foreground: 222 25% 12%;
+
+    /* ── Brand ── */
+    --primary:          221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:        38 92% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* ── Utility ── */
+    --muted:            220 14% 93%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent:           142 71% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive:      0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success:          142 71% 45%;
+    --warning:          38 92% 50%;
+    --info:             199 89% 48%;
+
+    /* ── Border / Input / Ring ── */
+    --border:           220 13% 88%;
+    --input:            220 13% 88%;
+    --ring:             221 83% 53%;
+
+    /* ── Radius ── */
+    --radius:           0.625rem;
+
+    /* ── Sidebar ── */
+    --sidebar:          222 47% 13%;
+    --sidebar-foreground: 220 10% 82%;
+    --sidebar-border:   222 40% 18%;
+    --sidebar-active:   221 83% 53%;
+    --sidebar-active-fg: 0 0% 100%;
+    --sidebar-hover:    222 40% 20%;
+
+    /* ── Typography ── */
+    --font-heading: 'Space Grotesk', sans-serif;
+    --font-body:    'Inter', sans-serif;
+  }
+
+  .dark {
+    --background:       222 47% 8%;
+    --foreground:       210 20% 93%;
+
+    --card:             222 47% 11%;
+    --card-foreground:  210 20% 93%;
+
+    --popover:          222 47% 11%;
+    --popover-foreground: 210 20% 93%;
+
+    --primary:          217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:        38 92% 50%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted:            223 40% 16%;
+    --muted-foreground: 215 16% 57%;
+
+    --accent:           142 71% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive:      0 63% 40%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:           223 40% 18%;
+    --input:            223 40% 18%;
+    --ring:             217 91% 60%;
+
+    --sidebar:          222 47% 6%;
+    --sidebar-foreground: 215 16% 70%;
+    --sidebar-border:   222 40% 12%;
+    --sidebar-active:   217 91% 60%;
+    --sidebar-active-fg: 0 0% 100%;
+    --sidebar-hover:    222 40% 13%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Typography Scale ── */
+  .text-display {
+    @apply text-3xl font-bold tracking-tight;
+    font-family: var(--font-heading);
+  }
+  .text-heading {
+    @apply text-xl font-semibold tracking-tight;
+    font-family: var(--font-heading);
+  }
+  .text-subheading {
+    @apply text-base font-semibold;
+    font-family: var(--font-heading);
+  }
+  .text-label {
+    @apply text-sm font-medium text-foreground;
+  }
+  .text-body {
+    @apply text-sm text-foreground leading-relaxed;
+  }
+  .text-caption {
+    @apply text-xs text-muted-foreground;
+  }
+  .text-overline {
+    @apply text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  /* ── Card System ── */
+  .card-standard {
+    @apply bg-card border border-border rounded-xl shadow-sm;
+  }
+  .glass-card {
+    @apply bg-card border border-border rounded-xl shadow-sm;
+  }
+  .solid-card {
+    @apply bg-card border border-border rounded-xl shadow-sm;
+  }
+
+  /* ── Page Layout ── */
+  .page-container {
+    @apply space-y-6 px-0;
+  }
+  .page-header {
+    @apply flex flex-col gap-1 pb-2;
+  }
+  .page-title {
+    @apply text-2xl font-bold text-foreground tracking-tight;
+    font-family: var(--font-heading);
+  }
+  .page-subtitle {
+    @apply text-sm text-muted-foreground mt-0.5;
+  }
+  .section-title {
+    @apply text-sm font-semibold text-foreground uppercase tracking-wider;
+    font-family: var(--font-heading);
+  }
+
+  /* ── Sidebar Colors via CSS variable ── */
+  .sidebar-bg      { background-color: hsl(var(--sidebar)); }
+  .sidebar-border  { border-color: hsl(var(--sidebar-border)); }
+  .sidebar-text    { color: hsl(var(--sidebar-foreground)); }
+
+  /* ── Interaction States ── */
+  .hover-lift {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-px;
+  }
+  .hover-highlight {
+    @apply transition-colors duration-150 hover:bg-muted;
+  }
+
+  /* ── Status Badges ── */
+  .badge-success    { @apply bg-emerald-50 text-emerald-700 border border-emerald-200; }
+  .badge-warning    { @apply bg-amber-50 text-amber-700 border border-amber-200; }
+  .badge-error      { @apply bg-red-50 text-red-700 border border-red-200; }
+  .badge-info       { @apply bg-blue-50 text-blue-700 border border-blue-200; }
+  .dark .badge-success { @apply bg-emerald-950 text-emerald-400 border-emerald-800; }
+  .dark .badge-warning { @apply bg-amber-950 text-amber-400 border-amber-800; }
+  .dark .badge-error   { @apply bg-red-950 text-red-400 border-red-800; }
+  .dark .badge-info    { @apply bg-blue-950 text-blue-400 border-blue-800; }
+
+  /* ── Scrollbar ── */
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+
+  /* ── Keep legacy aliases ── */
+  .gradient-primary  { @apply bg-primary; }
+  .gradient-secondary { @apply bg-secondary; }
+  .gradient-sidebar  { background-color: hsl(var(--sidebar)); }
+  .surface-primary   { @apply bg-primary; }
+  .surface-secondary { @apply bg-secondary; }
+  .surface-sidebar   { background-color: hsl(var(--sidebar)); }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slide-up {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
