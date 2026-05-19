@@ -11,6 +11,7 @@ namespace vpsims.Models
         public string Priority { get; set; } = "Normal"; // Normal, Urgent, Critical
         public string Description { get; set; } = null!;
         public string Status { get; set; } = "Pending"; // Pending, Procuring, Available, Rejected
+        public string? ImageUrl { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public User User { get; set; } = null!;

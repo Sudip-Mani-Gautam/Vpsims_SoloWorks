@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using vpsims.Data;
@@ -11,9 +12,11 @@ using vpsims.Data;
 namespace vpsims.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260512023521_SeedBranch")]
+    partial class SeedBranch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -253,7 +256,7 @@ namespace vpsims.Migrations
                             Id = 1,
                             Answer = "Navigate to the 'Book Appointment' section from your dashboard, select your vehicle, choose a service type and date, and submit. You will receive a notification once our staff approves it.",
                             Category = "Bookings",
-                            CreatedAt = new DateTime(2026, 5, 19, 5, 2, 26, 506, DateTimeKind.Utc).AddTicks(8310),
+                            CreatedAt = new DateTime(2026, 5, 12, 2, 35, 21, 160, DateTimeKind.Utc).AddTicks(2101),
                             DisplayOrder = 1,
                             HexColor = "Purple",
                             IsPublished = true,
@@ -264,7 +267,7 @@ namespace vpsims.Migrations
                             Id = 2,
                             Answer = "For every purchase and service completed, you earn loyalty points. These points can be redeemed for discounts on future parts or services. You can view your balance in your profile.",
                             Category = "Rewards",
-                            CreatedAt = new DateTime(2026, 5, 19, 5, 2, 26, 506, DateTimeKind.Utc).AddTicks(9385),
+                            CreatedAt = new DateTime(2026, 5, 12, 2, 35, 21, 160, DateTimeKind.Utc).AddTicks(3226),
                             DisplayOrder = 2,
                             HexColor = "Yellow",
                             IsPublished = true,
@@ -275,7 +278,7 @@ namespace vpsims.Migrations
                             Id = 3,
                             Answer = "Use the 'Request Parts' feature. Provide the part name, description, and your vehicle details. Our procurement team will find it for you and provide a quote.",
                             Category = "Parts",
-                            CreatedAt = new DateTime(2026, 5, 19, 5, 2, 26, 506, DateTimeKind.Utc).AddTicks(9387),
+                            CreatedAt = new DateTime(2026, 5, 12, 2, 35, 21, 160, DateTimeKind.Utc).AddTicks(3227),
                             DisplayOrder = 3,
                             HexColor = "Green",
                             IsPublished = true,
@@ -286,7 +289,7 @@ namespace vpsims.Migrations
                             Id = 4,
                             Answer = "Yes, all our genuine parts come with a manufacturer's warranty. The duration depends on the specific part and brand. Please keep your invoice for any warranty claims.",
                             Category = "Policies",
-                            CreatedAt = new DateTime(2026, 5, 19, 5, 2, 26, 506, DateTimeKind.Utc).AddTicks(9389),
+                            CreatedAt = new DateTime(2026, 5, 12, 2, 35, 21, 160, DateTimeKind.Utc).AddTicks(3229),
                             DisplayOrder = 4,
                             HexColor = "Red",
                             IsPublished = true,
@@ -348,12 +351,6 @@ namespace vpsims.Migrations
 
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("GuestName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
 
                     b.Property<string>("PaymentStatus")
                         .IsRequired()

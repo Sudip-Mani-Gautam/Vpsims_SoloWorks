@@ -218,7 +218,7 @@ namespace vpsims.Data
                 new User
                 {
                     Id = 1,
-                    Name = "VPSIMS ADMIN Alpha",
+                    Name = "VPSIMS ADMIN",
                     Email = "admin1@gmail.com",
                     PasswordHash = staticHash,
                     Role = "Admin",
@@ -228,7 +228,7 @@ namespace vpsims.Data
                 new User
                 {
                     Id = 2,
-                    Name = "VPSIMS Hub",
+                    Name = "VPSIMS Admin 2",
                     Email = "admin2@gmail.com",
                     PasswordHash = staticHash,
                     Role = "Admin",
@@ -243,6 +243,11 @@ namespace vpsims.Data
                 new FAQ { Id = 2, Question = "What is the 'Loyalty Points' system?", Answer = "For every purchase and service completed, you earn loyalty points. These points can be redeemed for discounts on future parts or services. You can view your balance in your profile.", Category = "Rewards", DisplayOrder = 2, IsPublished = true, HexColor = "Yellow" },
                 new FAQ { Id = 3, Question = "How can I request a part that is not in stock?", Answer = "Use the 'Request Parts' feature. Provide the part name, description, and your vehicle details. Our procurement team will find it for you and provide a quote.", Category = "Parts", DisplayOrder = 3, IsPublished = true, HexColor = "Green" },
                 new FAQ { Id = 4, Question = "Is there a warranty on the parts purchased?", Answer = "Yes, all our genuine parts come with a manufacturer's warranty. The duration depends on the specific part and brand. Please keep your invoice for any warranty claims.", Category = "Policies", DisplayOrder = 4, IsPublished = true, HexColor = "Red" }
+            );
+
+            // Seed Initial Branch
+            modelBuilder.Entity<Branch>().HasData(
+                new Branch { Id = 1, Name = "Main Service Center", Address = "123 Auto Lane", Phone = "555-0100", Latitude = 40.7128, Longitude = -74.0060, IsActive = true }
             );
         }
     }

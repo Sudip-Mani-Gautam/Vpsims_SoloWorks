@@ -9,6 +9,8 @@ namespace vpsims.Models
         public string Status { get; set; } = "Pending"; // Pending, Processing, Completed, Cancelled
         public string PaymentStatus { get; set; } = "Pending"; // Paid, Credit, Partial, Pending
         public decimal AmountPaid { get; set; } = 0;
+        public string? GuestName { get; set; }
+        public string? Notes { get; set; }
         public DateTime? DueDate { get; set; } // For credit/partial payments
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

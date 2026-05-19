@@ -781,7 +781,7 @@ namespace vpsims.Migrations
                             Email = "admin1@gmail.com",
                             IsActive = true,
                             LoyaltyPoints = 0,
-                            Name = "VPSIMS ADMIN Alpha",
+                            Name = "VPSIMS ADMIN ",
                             PasswordHash = "$2a$11$gkTiMazXgyVznv1jTAKbgemylmSgS8JoPufrwhfjfet5yeU7GKRwu",
                             Role = "Admin"
                         },
@@ -792,7 +792,7 @@ namespace vpsims.Migrations
                             Email = "admin2@gmail.com",
                             IsActive = true,
                             LoyaltyPoints = 0,
-                            Name = "VPSIMS Hub",
+                            Name = "VPSIMS Admin 2",
                             PasswordHash = "$2a$11$gkTiMazXgyVznv1jTAKbgemylmSgS8JoPufrwhfjfet5yeU7GKRwu",
                             Role = "Admin"
                         });
