@@ -19,6 +19,7 @@ namespace vpsims.Services
             {
                 secretKey = _configuration["StripeSettings:SecretKey"];
             }
+            System.Console.WriteLine($"[StripeService] Loaded key: {(string.IsNullOrEmpty(secretKey) ? "EMPTY" : $"FOUND (length {secretKey.Length}, starts with {secretKey.Substring(0, System.Math.Min(7, secretKey.Length))})")}");
             StripeConfiguration.ApiKey = secretKey;
         }
 
@@ -27,6 +28,18 @@ namespace vpsims.Services
             // Convert NPR to USD for Stripe payment processing (Stripe does not support card payments in NPR for standard merchant regions)
             decimal amountInUsd = amount / 133m;
             if (amountInUsd < 0.50m) amountInUsd = 0.50m; // Stripe minimum charge is 0.50 USD
+
+            var successUrl = System.Environment.GetEnvironmentVariable("STRIPE_SUCCESS_URL");
+            if (string.IsNullOrEmpty(successUrl) || successUrl.Contains("YOUR_SUCCESS_URL"))
+            {
+                successUrl = _configuration["StripeSettings:SuccessUrl"];
+            }
+
+            var cancelUrl = System.Environment.GetEnvironmentVariable("STRIPE_CANCEL_URL");
+            if (string.IsNullOrEmpty(cancelUrl) || cancelUrl.Contains("YOUR_CANCEL_URL"))
+            {
+                cancelUrl = _configuration["StripeSettings:CancelUrl"];
+            }
 
             var options = new SessionCreateOptions
             {
@@ -49,8 +62,8 @@ namespace vpsims.Services
                     },
                 },
                 Mode = "payment",
-                SuccessUrl = _configuration["StripeSettings:SuccessUrl"].Replace("{ORDER_ID}", orderId.ToString()),
-                CancelUrl = _configuration["StripeSettings:CancelUrl"],
+                SuccessUrl = successUrl.Replace("{ORDER_ID}", orderId.ToString()),
+                CancelUrl = cancelUrl,
                 CustomerEmail = customerEmail,
                 ClientReferenceId = orderId.ToString(),
                 Metadata = new Dictionary<string, string>
