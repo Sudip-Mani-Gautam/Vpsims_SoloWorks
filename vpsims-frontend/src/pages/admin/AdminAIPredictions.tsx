@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const LS_KEY = "vpsims_openrouter_api_key";
-const DEFAULT_API_KEY = "";
+const DEFAULT_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
 const FALLBACK_MODELS = [
   "meta-llama/llama-3.3-70b-instruct:free",
   "deepseek/deepseek-v4-flash:free",

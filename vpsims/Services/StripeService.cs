@@ -14,7 +14,12 @@ namespace vpsims.Services
         public StripeService(IConfiguration configuration)
         {
             _configuration = configuration;
-            StripeConfiguration.ApiKey = _configuration["StripeSettings:SecretKey"];
+            var secretKey = System.Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
+            if (string.IsNullOrEmpty(secretKey) || secretKey.Contains("YOUR_SECRET_KEY"))
+            {
+                secretKey = _configuration["StripeSettings:SecretKey"];
+            }
+            StripeConfiguration.ApiKey = secretKey;
         }
 
         public async Task<Session> CreateCheckoutSessionAsync(int orderId, decimal amount, string customerEmail)
