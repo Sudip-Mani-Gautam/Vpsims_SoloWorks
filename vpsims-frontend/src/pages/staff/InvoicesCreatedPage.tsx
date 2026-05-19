@@ -49,8 +49,14 @@ const InvoicesCreatedPage = () => {
 
   useEffect(() => { loadInvoices(); }, []);
 
-  const handleResend = (inv: string) => {
-      toast.success(`Invoice ${inv} has been re-queued for dispatch.`);
+  const handleResend = async (id: number, inv: string) => {
+      try {
+          await api.post(`/order/${id}/send-invoice`);
+          toast.success(`Invoice ${inv} has been successfully dispatched via email.`);
+      } catch (e) {
+          toast.error(`Failed to dispatch invoice ${inv}.`);
+          console.error(e);
+      }
   };
 
   const filtered = invoices.filter(i => 
@@ -112,11 +118,11 @@ const InvoicesCreatedPage = () => {
                   </TableCell>
                   <TableCell className="text-right pr-6">
                       <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleResend(i.invoiceNo)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
+                          <Button variant="ghost" size="sm" onClick={() => handleResend(i.id, i.invoiceNo)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
                               <Send className="w-3.5 h-3.5" />
                           </Button>
                           <Button variant="ghost" size="sm" asChild className="h-8 text-[10px] font-bold uppercase">
-                              <Link to="/staff/invoices">Invoice Details <ChevronRight className="w-3 h-3 ml-1" /></Link>
+                              <Link to="/staff/sales-invoices">Invoice Details <ChevronRight className="w-3 h-3 ml-1" /></Link>
                           </Button>
                       </div>
                   </TableCell>

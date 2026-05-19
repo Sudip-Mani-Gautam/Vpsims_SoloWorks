@@ -38,8 +38,8 @@ const CustomersServedPage = () => {
               userMap[o.userId] = {
                   userId: o.userId,
                   name: o.customerName || "Walk-in Customer",
-                  email: o.userEmail || "N/A",
-                  phone: o.userPhone || "N/A",
+                  email: o.customerEmail || "N/A",
+                  phone: o.customerPhone || "N/A",
                   lastOrderValue: 0,
                   orderCount: 0,
                   lastOrderTime: o.createdAt

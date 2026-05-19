@@ -1,4 +1,6 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +16,7 @@ import {
   ShieldCheck, 
   X, 
   RotateCcw,
-  ChevronDown
+  Loader2
 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import { toast } from "sonner";
@@ -37,6 +39,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+interface Order {
+  id: number;
+  userId: number;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  totalAmount: number;
+  status: string;
+  paymentStatus: string;
+  amountPaid: number;
+  dueDate: string | null;
+  createdAt: string;
+}
+
 interface CreditRecord {
   id: string;
   customerId: string;
@@ -48,22 +64,88 @@ interface CreditRecord {
   dueDate: string;
   daysOverdue: number;
   status: "pending" | "overdue" | "paid";
+  rawOrder: Order;
 }
 
-const initialCredits: CreditRecord[] = [
-  { id: "CR001", customerId: "C001", customerName: "Bikash Rai",  email: "bikash.rai@example.com",  phone: "9801111111", invoiceNo: "INV-2025-042", amount: 150.00, dueDate: "2025-04-10", daysOverdue: 0, status: "pending" },
-  { id: "CR002", customerId: "C002", customerName: "Anita Gurung", email: "anita.g@vpsims.com",      phone: "9802222222", invoiceNo: "INV-2025-028", amount: 450.00, dueDate: "2025-02-15", daysOverdue: 52, status: "overdue" },
-  { id: "CR003", customerId: "C005", customerName: "Suman Thapa",  email: "suman.thapa@gmail.com",  phone: "9805555555", invoiceNo: "INV-2025-019", amount: 320.00, dueDate: "2025-01-20", daysOverdue: 78, status: "overdue" },
-  { id: "CR004", customerId: "C003", customerName: "Prabin KC",    email: "prabin.kc@outlook.com",  phone: "9803333333", invoiceNo: "INV-2025-035", amount: 85.00,  dueDate: "2025-03-25", daysOverdue: 14, status: "pending" },
-  { id: "CR005", customerId: "C007", customerName: "Deepa Sharma", email: "deepa.sharma@vpsims.com", phone: "9807777777", invoiceNo: "INV-2024-098", amount: 1200.00, dueDate: "2024-12-01", daysOverdue: 128, status: "overdue" },
-];
-
 const CreditManagement = () => {
-  const [credits, setCredits] = useState<CreditRecord[]>(initialCredits);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [recordToConfirm, setRecordToConfirm] = useState<CreditRecord | null>(null);
-  const [lastUpdatedId, setLastUpdatedId] = useState<string | null>(null);
-  const lastAction = useRef<{ id: string; prevStatus: CreditRecord["status"] } | null>(null);
+
+  // Fetch all orders/invoices from backend
+  const { data: orders = [], isLoading } = useQuery<Order[]>({
+    queryKey: ["credit-orders"],
+    queryFn: async () => {
+      const { data } = await api.get("/order");
+      return data;
+    }
+  });
+
+  // Mutation to update payment status
+  const updatePaymentMutation = useMutation({
+    mutationFn: async ({ orderId, status, amountPaid }: { orderId: number; status: string; amountPaid: number }) => {
+      const { data } = await api.patch(`/order/${orderId}/payment`, {
+        paymentStatus: status,
+        amountPaid
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["credit-orders"] });
+      toast.success("Payment ledger updated successfully.");
+    },
+    onError: () => {
+      toast.error("Failed to update payment status.");
+    }
+  });
+
+  // Mutation to send invoice/reminder email
+  const emailMutation = useMutation({
+    mutationFn: (id: number) => api.post(`/order/${id}/send-invoice`),
+    onSuccess: () => {
+      toast.success("Invoice reminder/receipt sent successfully.");
+    },
+    onError: () => {
+      toast.error("Failed to send email notification.");
+    }
+  });
+
+  // Map backend orders to frontend CreditRecord format
+  const credits: CreditRecord[] = orders.map((o) => {
+    const isPaid = o.paymentStatus.toLowerCase() === "paid";
+    let daysOverdue = 0;
+    let calculatedStatus: "pending" | "overdue" | "paid" = "pending";
+
+    if (isPaid) {
+      calculatedStatus = "paid";
+    } else if (o.dueDate) {
+      const due = new Date(o.dueDate);
+      const today = new Date();
+      if (today > due) {
+        const diffTime = today.getTime() - due.getTime();
+        daysOverdue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        calculatedStatus = "overdue";
+      } else {
+        calculatedStatus = "pending";
+      }
+    } else {
+      calculatedStatus = "pending";
+    }
+
+    return {
+      id: o.id.toString(),
+      customerId: o.userId.toString(),
+      customerName: o.customerName,
+      email: o.customerEmail || "customer@vpsims.com",
+      phone: o.customerPhone || "N/A",
+      invoiceNo: `INV-${o.id.toString().padStart(6, "0")}`,
+      amount: o.totalAmount,
+      dueDate: o.dueDate ? new Date(o.dueDate).toISOString().split("T")[0] : "No Due Date",
+      daysOverdue,
+      status: calculatedStatus,
+      rawOrder: o
+    };
+  });
 
   const filtered = credits.filter((c) =>
     c.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -77,21 +159,11 @@ const CreditManagement = () => {
   const overdueCount = credits.filter((c) => c.status === "overdue").length;
 
   const handleSendReminder = (record: CreditRecord) => {
-    toast.success(`Payment reminder sent to ${record.email}`);
+    emailMutation.mutate(Number(record.id));
   };
 
   const handleSendInvoice = (record: CreditRecord) => {
-    toast.success(`Digital receipt dispatched to ${record.email}`);
-  };
-
-  const undoLastAction = () => {
-    if (lastAction.current) {
-      const { id, prevStatus } = lastAction.current;
-      setCredits(prev => prev.map(c => c.id === id ? { ...c, status: prevStatus } : c));
-      toast.info("Action undone. Credit status restored.");
-      lastAction.current = null;
-      setLastUpdatedId(null);
-    }
+    emailMutation.mutate(Number(record.id));
   };
 
   const handleStatusChange = (id: string, newStatus: string) => {
@@ -103,33 +175,24 @@ const CreditManagement = () => {
       return;
     }
 
-    // Normal status update
-    setCredits(prev => prev.map(c => c.id === id ? { ...c, status: newStatus as any } : c));
-    toast.info(`Status updated to ${newStatus}`);
+    // Pending or Overdue status update
+    updatePaymentMutation.mutate({
+      orderId: Number(id),
+      status: newStatus.charAt(0).toUpperCase() + newStatus.slice(1),
+      amountPaid: 0
+    });
   };
 
   const confirmMarkPaid = () => {
     if (!recordToConfirm) return;
-    const { id } = recordToConfirm;
     
-    lastAction.current = { id, prevStatus: recordToConfirm.status };
-    setLastUpdatedId(id);
-    
-    setCredits(prev => prev.map((c) => c.id === id ? { ...c, status: "paid" as const } : c));
-    handleSendInvoice({ ...recordToConfirm, status: "paid" });
-    
-    toast.success("Payment confirmed successfully!", {
-      description: `Receipt sent to ${recordToConfirm.email}`,
-      action: {
-        label: "Undo",
-        onClick: undoLastAction,
-      },
+    updatePaymentMutation.mutate({
+      orderId: Number(recordToConfirm.id),
+      status: "Paid",
+      amountPaid: recordToConfirm.rawOrder.totalAmount
     });
 
     setRecordToConfirm(null);
-    setTimeout(() => {
-      setLastUpdatedId(prev => prev === id ? null : prev);
-    }, 10000);
   };
 
   return (
@@ -157,95 +220,96 @@ const CreditManagement = () => {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="font-bold text-xs uppercase pl-6">Customer Persona</TableHead>
-                <TableHead className="font-bold text-xs uppercase">Email Address</TableHead>
-                <TableHead className="font-bold text-xs uppercase">Invoice Ref</TableHead>
-                <TableHead className="font-bold text-xs uppercase">Amount (NPR)</TableHead>
-                <TableHead className="font-bold text-xs uppercase">Due Date</TableHead>
-                <TableHead className="font-bold text-xs uppercase">Overdue</TableHead>
-                <TableHead className="font-bold text-xs uppercase text-center">Status</TableHead>
-                <TableHead className="font-bold text-xs uppercase text-right pr-6">Management</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((c) => (
-                <TableRow key={c.id} className={cn("hover:bg-muted/20 transition-colors", c.daysOverdue > 30 ? "bg-destructive/5" : "")}>
-                  <TableCell className="pl-6">
-                    <div className="font-black text-foreground">{c.customerName}</div>
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        {c.phone}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                        <Mail className="w-3 h-3" /> {c.email}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs font-black text-primary">{c.invoiceNo}</TableCell>
-                  <TableCell className="font-black tabular-nums text-foreground">Rs. {c.amount.toLocaleString()}</TableCell>
-                  <TableCell className="text-xs font-bold text-muted-foreground">{c.dueDate}</TableCell>
-                  <TableCell>
-                    {c.daysOverdue > 0 ? (
-                      <Badge variant="outline" className={cn("font-black text-[10px] uppercase", c.daysOverdue > 30 ? "bg-destructive/10 text-destructive border-destructive/30" : "bg-warning/10 text-warning border-warning/30")}>
-                        {c.daysOverdue} days
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground italic text-xs">Current</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex flex-col items-center gap-1">
-                        <Select value={c.status} onValueChange={(val) => handleStatusChange(c.id, val)}>
-                            <SelectTrigger className={cn(
-                                "w-[110px] h-8 text-[10px] font-black uppercase tracking-wider border-none shadow-sm",
-                                c.status === "paid" ? "bg-success/10 text-success" : 
-                                c.status === "overdue" ? "bg-destructive/10 text-destructive" : 
-                                "bg-warning/10 text-warning"
-                            )}>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="glass-card border-border/50">
-                                <SelectItem value="pending" className="text-[10px] font-bold uppercase text-warning">Pending</SelectItem>
-                                <SelectItem value="overdue" className="text-[10px] font-bold uppercase text-destructive">Overdue</SelectItem>
-                                <SelectItem value="paid" className="text-[10px] font-bold uppercase text-success">Paid</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        
-                        {lastUpdatedId === c.id && (
-                            <button 
-                                onClick={undoLastAction}
-                                className="flex items-center gap-1 text-[9px] font-black text-primary hover:underline animate-pulse"
-                            >
-                                <RotateCcw className="w-2.5 h-2.5" /> UNDO MISTAKE
-                            </button>
-                        )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right pr-6">
-                    <div className="flex justify-end gap-1.5">
-                      {c.status === "paid" ? (
-                        <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase text-primary hover:bg-primary/10 transition-colors" onClick={() => handleSendInvoice(c)}>
-                            <Send className="w-3.5 h-3.5 mr-1" /> Send Email
-                        </Button>
-                      ) : (
-                        <>
-                          <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase text-warning hover:bg-warning/10 transition-colors" onClick={() => handleSendReminder(c)}>
-                            <Mail className="w-3.5 h-3.5 mr-1" /> Remind
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase text-success hover:bg-success/10 transition-colors" onClick={() => setRecordToConfirm(c)}>
-                            <CheckCircle className="w-3.5 h-3.5 mr-1" /> Paid
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
+          {isLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary opacity-50" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-muted-foreground text-sm font-medium">
+              No ledger entries found.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="font-bold text-xs uppercase pl-6">Customer Persona</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">Email Address</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">Invoice Ref</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">Amount (NPR)</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">Due Date</TableHead>
+                  <TableHead className="font-bold text-xs uppercase">Overdue</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-center">Status</TableHead>
+                  <TableHead className="font-bold text-xs uppercase text-right pr-6">Management</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((c) => (
+                  <TableRow key={c.id} className={cn("hover:bg-muted/20 transition-colors", c.daysOverdue > 30 ? "bg-destructive/5" : "")}>
+                    <TableCell className="pl-6">
+                      <div className="font-black text-foreground">{c.customerName}</div>
+                      <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          {c.phone}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <Mail className="w-3 h-3" /> {c.email}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-black text-primary">{c.invoiceNo}</TableCell>
+                    <TableCell className="font-black tabular-nums text-foreground">Rs. {c.amount.toLocaleString()}</TableCell>
+                    <TableCell className="text-xs font-bold text-muted-foreground">{c.dueDate}</TableCell>
+                    <TableCell>
+                      {c.daysOverdue > 0 ? (
+                        <Badge variant="outline" className={cn("font-black text-[10px] uppercase", c.daysOverdue > 30 ? "bg-destructive/10 text-destructive border-destructive/30" : "bg-warning/10 text-warning border-warning/30")}>
+                          {c.daysOverdue} days
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground italic text-xs">Current</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex flex-col items-center gap-1">
+                          <Select value={c.status} onValueChange={(val) => handleStatusChange(c.id, val)}>
+                              <SelectTrigger className={cn(
+                                  "w-[110px] h-8 text-[10px] font-black uppercase tracking-wider border-none shadow-sm",
+                                  c.status === "paid" ? "bg-success/10 text-success" : 
+                                  c.status === "overdue" ? "bg-destructive/10 text-destructive" : 
+                                  "bg-warning/10 text-warning"
+                              )}>
+                                  <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="glass-card border-border/50">
+                                  <SelectItem value="pending" className="text-[10px] font-bold uppercase text-warning">Pending</SelectItem>
+                                  <SelectItem value="overdue" className="text-[10px] font-bold uppercase text-destructive">Overdue</SelectItem>
+                                  <SelectItem value="paid" className="text-[10px] font-bold uppercase text-success">Paid</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <div className="flex justify-end gap-1.5">
+                        {c.status === "paid" ? (
+                          <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase text-primary hover:bg-primary/10 transition-colors" onClick={() => handleSendInvoice(c)}>
+                              <Send className="w-3.5 h-3.5 mr-1" /> Send Email
+                          </Button>
+                        ) : (
+                          <>
+                            <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase text-warning hover:bg-warning/10 transition-colors" onClick={() => handleSendReminder(c)}>
+                              <Mail className="w-3.5 h-3.5 mr-1" /> Remind
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-8 px-3 text-[10px] font-black uppercase text-success hover:bg-success/10 transition-colors" onClick={() => setRecordToConfirm(c)}>
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" /> Paid
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

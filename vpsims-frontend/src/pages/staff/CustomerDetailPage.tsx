@@ -1,31 +1,43 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, Car, ShoppingCart, Wrench, Mail, Phone, MapPin, CreditCard, Trophy, Star, Loader2, Package, CheckCircle2, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft, Mail, Phone, MapPin, Trophy, Star,
+  Loader2, Car, ShoppingCart, Wrench, Package,
+  CalendarDays, DollarSign, Clock, CheckCircle2
+} from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface CustomerData {
-  id: number;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  loyaltyPoints: number;
-  totalSpent: number;
-  pendingPayments: number;
-  createdAt: string;
-  vehicles: Array<{ id: number; make: string; model: string; year: number; licensePlate: string }>;
-  orders: Array<{ id: number; totalAmount: number; status: string; paymentStatus: string; createdAt: string }>;
-  requests: Array<{ id: number; partName: string; status: string; createdAt: string }>;
-  bookings: Array<{ id: number; serviceType: string; serviceDate: string; status: string; branchName: string }>;
+  id: number; name: string; email: string; phone: string; address: string;
+  loyaltyPoints: number; totalSpent: number; pendingPayments: number; createdAt: string;
+  vehicles:  Array<{ id: number; make: string; model: string; year: number; licensePlate: string }>;
+  orders:    Array<{ id: number; totalAmount: number; status: string; paymentStatus: string; createdAt: string }>;
+  requests:  Array<{ id: number; partName: string; status: string; createdAt: string }>;
+  bookings:  Array<{ id: number; serviceType: string; serviceDate: string; status: string; branchName: string }>;
 }
+
+const getLoyaltyTier = (pts: number) => {
+  if (pts >= 1000) return { label: "Platinum", cls: "bg-slate-800 text-slate-100" };
+  if (pts >= 500)  return { label: "Gold",     cls: "bg-amber-500 text-white"      };
+  if (pts >= 100)  return { label: "Silver",   cls: "bg-slate-400 text-white"      };
+  return                  { label: "Bronze",   cls: "bg-orange-700 text-white"     };
+};
+
+const statusCls = (s: string) => {
+  const l = s?.toLowerCase();
+  if (l === "paid" || l === "completed" || l === "approved")
+    return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800";
+  if (l === "pending")
+    return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800";
+  return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+};
 
 const CustomerDetailPage = () => {
   const { id } = useParams();
@@ -34,238 +46,285 @@ const CustomerDetailPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDetail = async () => {
-      try {
-        const res = await api.get(`/user/${id}/detail`);
-        setData(res.data);
-      } catch {
-        toast.error("Failed to fetch customer profile.");
-        navigate('/staff/customers');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchDetail();
+    api.get(`/user/${id}/detail`)
+      .then(r => setData(r.data))
+      .catch(() => { toast.error("Failed to load customer."); navigate(-1); })
+      .finally(() => setLoading(false));
   }, [id, navigate]);
 
-
-
   if (loading) return (
-    <div className="h-96 flex items-center justify-center">
-      <Loader2 className="w-10 h-10 animate-spin text-primary opacity-20" />
+    <div className="h-72 flex items-center justify-center">
+      <Loader2 className="w-7 h-7 animate-spin text-primary opacity-30" />
     </div>
   );
-
   if (!data) return null;
 
-  const getLoyaltyTier = (points: number) => {
-    if (points >= 1000) return { label: "Platinum", color: "bg-slate-900 text-slate-100", icon: <Trophy className="w-4 h-4" /> };
-    if (points >= 500) return { label: "Gold", color: "bg-amber-500 text-white", icon: <Star className="w-4 h-4" /> };
-    if (points >= 100) return { label: "Silver", color: "bg-slate-400 text-white", icon: <Star className="w-4 h-4" /> };
-    return { label: "Bronze", color: "bg-orange-700 text-white", icon: <Star className="w-4 h-4" /> };
-  };
-
   const tier = getLoyaltyTier(data.loyaltyPoints);
-  const isTopBuyer = data.totalSpent > 10000;
+  const initials = data.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8 bg-background min-h-screen">
-      {/* Balanced Professional Header */}
-      <div className="flex items-center justify-between border-b border-border pb-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-2 border-border hover:bg-muted transition-all shadow-sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
+    <div className="space-y-3 animate-fade-in">
+      {/* ── Page Header ── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground uppercase">Customer Intelligence</h1>
-            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mt-1">High-Value Relationship Management</p>
+            <h1 className="text-lg font-bold text-foreground tracking-tight" style={{ fontFamily: "var(--font-heading)" }}>
+              Customer Profile
+            </h1>
+            <p className="text-xs text-muted-foreground">Full activity history and account details</p>
           </div>
         </div>
-        {isTopBuyer && (
-          <Badge className="bg-primary text-white border-none px-4 py-1.5 rounded-full flex items-center gap-2 animate-pulse text-[10px] font-black shadow-lg shadow-primary/20">
-            <Trophy className="w-4 h-4" /> TOP BUYER DISTINCTION
+        {data.totalSpent > 10000 && (
+          <Badge className="bg-primary/10 text-primary border border-primary/20 gap-1.5 text-xs font-semibold">
+            <Trophy className="w-3 h-3" /> Top Buyer
           </Badge>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Customer Info Card - Professional Solid */}
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="border-2 border-border rounded-2xl bg-card shadow-xl overflow-hidden">
-            <div className="h-32 bg-primary/5 border-b-2 border-border flex items-center justify-center relative">
-               <div className="w-20 h-20 rounded-2xl bg-background border-2 border-border flex items-center justify-center text-primary text-3xl font-black shadow-xl">
-                 {data.name[0]}
-               </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* ── Left: Profile Card ── */}
+        <div className="lg:col-span-3 space-y-3">
+          <Card className="card-standard overflow-hidden">
+            {/* Avatar strip */}
+            <div className="bg-gradient-to-br from-primary/10 to-primary/5 border-b border-border px-4 pt-5 pb-10 flex justify-center">
+              <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-primary/30">
+                {initials}
+              </div>
             </div>
-            <CardContent className="pt-8 pb-6 px-6 space-y-6">
-              <div className="flex flex-col items-center text-center">
-                <h3 className="font-black text-xl uppercase tracking-tight text-foreground">{data.name}</h3>
-                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mt-1">LOG ID: VPS-{data.id.toString().padStart(4, '0')}</p>
-                
-                <div className="flex flex-wrap justify-center gap-2 mt-5">
-                  <Badge className={cn("px-4 py-1 rounded-full border-none shadow-md flex items-center gap-2 text-[10px] font-black uppercase transition-all hover:scale-105", tier.color)}>
-                    {tier.icon} {tier.label}
+
+            <CardContent className="px-4 pb-4 -mt-6 space-y-4">
+              {/* Name + ID */}
+              <div className="text-center">
+                <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+                  {data.name}
+                </h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  C-{data.id.toString().padStart(4, "0")}
+                </p>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <Badge className={cn("text-[10px] font-semibold border-none px-2.5 py-0.5", tier.cls)}>
+                    {tier.label}
                   </Badge>
-                  <Badge variant="outline" className="font-black text-[10px] uppercase border-border px-4 py-1 rounded-full">{data.loyaltyPoints} POINTS</Badge>
+                  <Badge variant="outline" className="text-[10px] font-medium px-2.5 py-0.5">
+                    {data.loyaltyPoints} pts
+                  </Badge>
                 </div>
               </div>
 
-              <div className="space-y-3 pt-6 border-t border-border">
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-xl border border-border">
-                   <Mail className="w-4 h-4 text-primary" />
-                   <span className="text-sm font-bold truncate">{data.email}</span>
+              {/* Contact info */}
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                  <Mail className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                  <span className="truncate">{data.email}</span>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-xl border border-border">
-                   <Phone className="w-4 h-4 text-primary" />
-                   <span className="text-sm font-bold">{data.phone}</span>
+                <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                  <Phone className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                  <span>{data.phone}</span>
                 </div>
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-xl border border-border">
-                   <MapPin className="w-4 h-4 text-primary" />
-                   <span className="text-sm font-bold truncate">{data.address}</span>
+                <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                  <span className="truncate">{data.address}</span>
                 </div>
               </div>
 
-
-              <div className="mt-6 p-5 rounded-2xl bg-muted border-2 border-border space-y-4">
-                  <div className="flex justify-between items-end">
-                      <div>
-                          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Lifetime Revenue</p>
-                          <p className="text-2xl font-black text-primary">${data.totalSpent.toLocaleString()}</p>
-                      </div>
-                      <Trophy className="w-8 h-8 text-primary opacity-20" />
+              {/* Financial metrics */}
+              <div className="border-t border-border pt-3 grid grid-cols-1 gap-2">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                  <div>
+                    <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">Lifetime Spent</p>
+                    <p className="text-base font-bold text-emerald-700 dark:text-emerald-300">
+                      NPR {data.totalSpent.toLocaleString()}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
-                      <div>
-                          <p className="text-[9px] font-black text-muted-foreground uppercase">Pending Value</p>
-                          <p className="text-sm font-black text-destructive">${data.pendingPayments.toLocaleString()}</p>
-                      </div>
-                      <div>
-                          <p className="text-[9px] font-black text-muted-foreground uppercase">Joined On</p>
-                          <p className="text-sm font-black text-foreground">{new Date(data.createdAt).toLocaleDateString()}</p>
-                      </div>
+                  <DollarSign className="w-5 h-5 text-emerald-500 opacity-60" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-lg bg-muted/60 border border-border">
+                    <p className="text-[10px] text-muted-foreground font-medium">Pending</p>
+                    <p className="text-sm font-bold text-destructive">NPR {data.pendingPayments.toLocaleString()}</p>
                   </div>
+                  <div className="p-2.5 rounded-lg bg-muted/60 border border-border">
+                    <p className="text-[10px] text-muted-foreground font-medium">Joined</p>
+                    <p className="text-sm font-bold text-foreground">{new Date(data.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Dynamic Activity/Tabs Area */}
-        <div className="lg:col-span-8 space-y-6">
-          <Tabs defaultValue="vehicles" className="space-y-6">
-            <TabsList className="grid grid-cols-4 w-full bg-muted border-2 border-border p-1.5 rounded-2xl h-14">
-              <TabsTrigger value="vehicles" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white font-black text-[10px] uppercase tracking-[0.2em] transition-all">Fleet Registry</TabsTrigger>
-              <TabsTrigger value="purchases" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white font-black text-[10px] uppercase tracking-[0.2em] transition-all">Invoicing Log</TabsTrigger>
-              <TabsTrigger value="services" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white font-black text-[10px] uppercase tracking-[0.2em] transition-all">Service History</TabsTrigger>
-              <TabsTrigger value="requests" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white font-black text-[10px] uppercase tracking-[0.2em] transition-all">Part Requests</TabsTrigger>
+        {/* ── Right: Activity Tabs ── */}
+        <div className="lg:col-span-9">
+          <Tabs defaultValue="vehicles" className="space-y-3">
+            <TabsList className="bg-muted border border-border h-8 p-0.5 rounded-lg gap-0.5">
+              {[
+                { value: "vehicles",  label: "Vehicles",        icon: <Car className="w-3 h-3" />,          count: data.vehicles.length  },
+                { value: "purchases", label: "Invoices",        icon: <ShoppingCart className="w-3 h-3" />, count: data.orders.length    },
+                { value: "services",  label: "Service History", icon: <Wrench className="w-3 h-3" />,       count: data.bookings.length  },
+                { value: "requests",  label: "Part Requests",   icon: <Package className="w-3 h-3" />,      count: data.requests.length  },
+              ].map(({ value, label, icon, count }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="flex items-center gap-1.5 h-7 px-3 text-xs font-semibold rounded-md data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+                >
+                  {icon} {label}
+                  {count > 0 && (
+                    <span className="ml-0.5 text-[10px] font-bold opacity-70">({count})</span>
+                  )}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
-            <TabsContent value="vehicles" className="space-y-4 animate-in fade-in duration-300">
-              <Card className="border-2 border-border rounded-2xl bg-card overflow-hidden shadow-xl">
-                <Table>
-                  <TableHeader className="bg-muted border-b-2 border-border">
-                    <TableRow>
-                      <TableHead className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground">Registry Plate</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Manufacturer</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Model Variant</TableHead>
-                      <TableHead className="text-right px-6 text-[10px] font-black uppercase tracking-widest text-foreground">Year</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.vehicles.map((v) => (
-                      <TableRow key={v.id} className="border-b border-border hover:bg-muted/30 transition-colors h-14">
-                        <TableCell className="px-6 font-mono text-sm font-black text-primary uppercase tracking-tighter">{v.licensePlate}</TableCell>
-                        <TableCell className="font-black text-sm uppercase">{v.make}</TableCell>
-                        <TableCell className="font-bold text-sm text-muted-foreground uppercase">{v.model}</TableCell>
-                        <TableCell className="text-right px-6 font-black text-sm">{v.year}</TableCell>
+            {/* Vehicles */}
+            <TabsContent value="vehicles" className="m-0">
+              <Card className="card-standard overflow-hidden">
+                <CardHeader className="py-2.5 px-4 border-b border-border">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Car className="w-4 h-4 text-primary" /> Fleet Registry
+                  </CardTitle>
+                </CardHeader>
+                {data.vehicles.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground">No vehicles registered</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 h-8">
+                        {["License Plate", "Make", "Model", "Year"].map(h => (
+                          <TableHead key={h} className="py-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground first:pl-4 last:pr-4 last:text-right">{h}</TableHead>
+                        ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data.vehicles.map(v => (
+                        <TableRow key={v.id} className="hover:bg-muted/30 h-10">
+                          <TableCell className="pl-4 py-0 font-mono text-xs font-semibold text-primary">{v.licensePlate}</TableCell>
+                          <TableCell className="py-0 text-sm font-semibold text-foreground">{v.make}</TableCell>
+                          <TableCell className="py-0 text-xs text-muted-foreground">{v.model}</TableCell>
+                          <TableCell className="pr-4 py-0 text-right text-xs font-medium text-muted-foreground">{v.year}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </Card>
             </TabsContent>
 
-            <TabsContent value="purchases" className="space-y-4 animate-in fade-in duration-300">
-              <Card className="border-2 border-border rounded-2xl bg-card overflow-hidden shadow-xl">
-                <Table>
-                  <TableHeader className="bg-muted border-b-2 border-border">
-                    <TableRow>
-                      <TableHead className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground">Invoice Reference</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Date</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Financial Value</TableHead>
-                      <TableHead className="text-center text-[10px] font-black uppercase tracking-widest text-foreground">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.orders.map((o) => (
-                      <TableRow key={o.id} className="border-b border-border hover:bg-muted/30 transition-colors h-14">
-                        <TableCell className="px-6 font-black text-sm">#INV-{o.id.toString().padStart(5, '0')}</TableCell>
-                        <TableCell className="text-xs font-bold text-muted-foreground uppercase">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="font-black text-sm text-foreground tabular-nums">${o.totalAmount.toLocaleString()}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge className={cn("text-[9px] font-black uppercase px-2 py-0.5 border-none shadow-sm", o.paymentStatus === "Paid" ? "bg-emerald-500 text-white" : "bg-amber-500 text-white")}>
-                            {o.paymentStatus}
-                          </Badge>
-                        </TableCell>
+            {/* Invoices */}
+            <TabsContent value="purchases" className="m-0">
+              <Card className="card-standard overflow-hidden">
+                <CardHeader className="py-2.5 px-4 border-b border-border">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <ShoppingCart className="w-4 h-4 text-primary" /> Invoice History
+                  </CardTitle>
+                </CardHeader>
+                {data.orders.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground">No orders yet</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 h-8">
+                        {["Invoice", "Date", "Amount", "Payment"].map(h => (
+                          <TableHead key={h} className="py-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground first:pl-4 last:pr-4 last:text-right">{h}</TableHead>
+                        ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data.orders.map(o => (
+                        <TableRow key={o.id} className="hover:bg-muted/30 h-10">
+                          <TableCell className="pl-4 py-0 font-mono text-xs text-muted-foreground">#INV-{o.id.toString().padStart(5, "0")}</TableCell>
+                          <TableCell className="py-0 text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell className="py-0 text-sm font-semibold text-foreground tabular-nums">NPR {o.totalAmount.toLocaleString()}</TableCell>
+                          <TableCell className="pr-4 py-0 text-right">
+                            <span className={cn("inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border", statusCls(o.paymentStatus))}>
+                              {o.paymentStatus}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </Card>
             </TabsContent>
 
-            <TabsContent value="services" className="space-y-4 animate-in fade-in duration-300">
-              <Card className="border-2 border-border rounded-2xl bg-card overflow-hidden shadow-xl">
-                <Table>
-                  <TableHeader className="bg-muted border-b-2 border-border">
-                    <TableRow>
-                      <TableHead className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground">Booking ID</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Service Type</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Branch</TableHead>
-                      <TableHead className="text-center text-[10px] font-black uppercase tracking-widest text-foreground">Status</TableHead>
-                      <TableHead className="text-right px-6 text-[10px] font-black uppercase tracking-widest text-foreground">Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(data.bookings || []).map((b) => (
-                      <TableRow key={b.id} className="border-b border-border hover:bg-muted/30 transition-colors h-14">
-                        <TableCell className="px-6 font-mono text-xs font-bold text-muted-foreground">#BOK-{b.id}</TableCell>
-                        <TableCell className="font-black text-sm uppercase">{b.serviceType}</TableCell>
-                        <TableCell className="text-xs font-bold text-muted-foreground uppercase">{b.branchName}</TableCell>
-                        <TableCell className="text-center">
-                           <Badge variant="outline" className="text-[9px] font-black uppercase border-border/50 px-2 h-5 rounded-sm">{b.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right px-6 text-xs font-bold text-muted-foreground">{new Date(b.serviceDate).toLocaleDateString()}</TableCell>
+            {/* Service History */}
+            <TabsContent value="services" className="m-0">
+              <Card className="card-standard overflow-hidden">
+                <CardHeader className="py-2.5 px-4 border-b border-border">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-primary" /> Service History
+                  </CardTitle>
+                </CardHeader>
+                {data.bookings.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground">No service bookings</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 h-8">
+                        {["Booking", "Service", "Branch", "Date", "Status"].map(h => (
+                          <TableHead key={h} className="py-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground first:pl-4 last:pr-4 last:text-right">{h}</TableHead>
+                        ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data.bookings.map(b => (
+                        <TableRow key={b.id} className="hover:bg-muted/30 h-10">
+                          <TableCell className="pl-4 py-0 font-mono text-xs text-muted-foreground">#BOK-{b.id}</TableCell>
+                          <TableCell className="py-0 text-sm font-semibold text-foreground">{b.serviceType}</TableCell>
+                          <TableCell className="py-0 text-xs text-muted-foreground">{b.branchName}</TableCell>
+                          <TableCell className="py-0 text-xs text-muted-foreground">{new Date(b.serviceDate).toLocaleDateString()}</TableCell>
+                          <TableCell className="pr-4 py-0 text-right">
+                            <span className={cn("inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border", statusCls(b.status))}>
+                              {b.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </Card>
             </TabsContent>
 
-            <TabsContent value="requests" className="space-y-4 animate-in fade-in duration-300">
-              <Card className="border-2 border-border rounded-2xl bg-card overflow-hidden shadow-xl">
-                <Table>
-                  <TableHeader className="bg-muted border-b-2 border-border">
-                    <TableRow>
-                      <TableHead className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground">Request ID</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground">Part Designation</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-foreground text-center">State</TableHead>
-                      <TableHead className="text-right px-6 text-[10px] font-black uppercase tracking-widest text-foreground">Log Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.requests.map((r) => (
-                      <TableRow key={r.id} className="border-b border-border hover:bg-muted/30 transition-colors h-14">
-                        <TableCell className="px-6 font-mono text-xs font-bold text-muted-foreground">#PRQ-{r.id}</TableCell>
-                        <TableCell className="font-black text-sm text-primary uppercase">{r.partName}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline" className="text-[9px] font-black uppercase border-border/50 px-2 h-5 rounded-sm">{r.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right px-6 text-xs font-bold text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</TableCell>
+            {/* Part Requests */}
+            <TabsContent value="requests" className="m-0">
+              <Card className="card-standard overflow-hidden">
+                <CardHeader className="py-2.5 px-4 border-b border-border">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Package className="w-4 h-4 text-primary" /> Part Requests
+                  </CardTitle>
+                </CardHeader>
+                {data.requests.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-muted-foreground">No part requests</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 h-8">
+                        {["Request ID", "Part Name", "Date", "Status"].map(h => (
+                          <TableHead key={h} className="py-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground first:pl-4 last:pr-4 last:text-right">{h}</TableHead>
+                        ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {data.requests.map(r => (
+                        <TableRow key={r.id} className="hover:bg-muted/30 h-10">
+                          <TableCell className="pl-4 py-0 font-mono text-xs text-muted-foreground">#PRQ-{r.id}</TableCell>
+                          <TableCell className="py-0 text-sm font-semibold text-foreground">{r.partName}</TableCell>
+                          <TableCell className="py-0 text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell className="pr-4 py-0 text-right">
+                            <span className={cn("inline-flex px-2 py-0.5 rounded text-[10px] font-semibold border", statusCls(r.status))}>
+                              {r.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </Card>
             </TabsContent>
           </Tabs>

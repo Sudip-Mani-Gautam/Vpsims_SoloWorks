@@ -1,41 +1,69 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search as SearchIcon, User, Phone, Hash, Car } from "lucide-react";
+import { Search as SearchIcon, User, Phone, Hash, Car, Mail, Trophy, Loader2, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
-const customers = [
-  { id: "C001", name: "Bikash Rai", phone: "9801111111", vehicleNo: "BA-1-KHA-1234", vehicleModel: "Toyota Corolla 2020", email: "bikash@email.com", purchases: 8, totalSpent: 1250 },
-  { id: "C002", name: "Anita Gurung", phone: "9802222222", vehicleNo: "BA-2-KA-5678", vehicleModel: "Honda Civic 2019", email: "anita@email.com", purchases: 15, totalSpent: 5800 },
-  { id: "C003", name: "Prabin KC", phone: "9803333333", vehicleNo: "BA-1-JA-9012", vehicleModel: "Suzuki Swift 2021", email: "prabin@email.com", purchases: 3, totalSpent: 320 },
-];
+interface Vehicle {
+  make: string;
+  model: string;
+  year: number;
+  licensePlate: string;
+}
+
+interface Customer {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string;
+  loyaltyPoints: number;
+  vehicles?: Vehicle[];
+}
 
 const SearchPage = () => {
   const [query, setQuery] = useState("");
   const [searchBy, setSearchBy] = useState("name");
 
+  // Fetch real customers from database
+  const { data: customers = [], isLoading } = useQuery<Customer[]>({
+    queryKey: ["search-customers"],
+    queryFn: async () => {
+      const { data } = await api.get("/user");
+      return data.filter((u: any) => u.role?.toLowerCase() === "customer");
+    }
+  });
+
   const filtered = customers.filter(c => {
     const val = query.toLowerCase();
+    if (!val) return true; // Show all by default
     if (searchBy === "name") return c.name.toLowerCase().includes(val);
-    if (searchBy === "phone") return c.phone.includes(val);
-    if (searchBy === "id") return c.id.toLowerCase().includes(val);
-    if (searchBy === "vehicle") return c.vehicleNo.toLowerCase().includes(val);
+    if (searchBy === "phone") return (c.phone || "").includes(val);
+    if (searchBy === "id") return `C-${c.id.toString().padStart(4, "0")}`.toLowerCase().includes(val) || String(c.id).includes(val);
+    if (searchBy === "vehicle") return c.vehicles?.some(v => v.licensePlate.toLowerCase().includes(val));
     return false;
   });
 
-  const icons = { name: <User className="w-4 h-4" />, phone: <Phone className="w-4 h-4" />, id: <Hash className="w-4 h-4" />, vehicle: <Car className="w-4 h-4" /> };
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="page-title">Customer Search</h1>
-        <p className="text-muted-foreground">Find customers by name, phone, ID, or vehicle number</p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild className="rounded-full">
+            <Link to="/staff"><ArrowLeft className="w-5 h-5" /></Link>
+        </Button>
+        <div>
+          <h1 className="text-3xl font-heading font-black tracking-tight text-foreground">Customer Search</h1>
+          <p className="text-muted-foreground">Find customers by name, phone, ID, or vehicle number</p>
+        </div>
       </div>
+
       <Card className="glass-card">
         <CardContent className="pt-6">
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Select value={searchBy} onValueChange={setSearchBy}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="name">By Name</SelectItem>
                 <SelectItem value="phone">By Phone</SelectItem>
@@ -50,29 +78,71 @@ const SearchPage = () => {
           </div>
         </CardContent>
       </Card>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((c) => (
-          <Card key={c.id} className="glass-card hover-lift">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">{c.name[0]}</div>
-                <div className="flex-1">
-                  <h3 className="font-heading font-semibold text-foreground">{c.name}</h3>
-                  <p className="text-xs text-muted-foreground">{c.id}</p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground"><Phone className="w-3 h-3" />{c.phone}</div>
-                <div className="flex items-center gap-2 text-muted-foreground"><Car className="w-3 h-3" />{c.vehicleModel} ({c.vehicleNo})</div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-border flex justify-between text-sm">
-                <span className="text-muted-foreground">{c.purchases} purchases</span>
-                <span className="font-medium text-foreground">${c.totalSpent.toLocaleString()}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+
+      {isLoading ? (
+        <div className="h-64 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary opacity-50" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground italic font-semibold">
+          No matching customers found in registry.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((c) => (
+            <Link key={c.id} to={`/staff/customers/${c.id}`}>
+              <Card className="glass-card hover-lift h-full flex flex-col justify-between">
+                <CardContent className="pt-6 flex flex-col justify-between h-full">
+                  <div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-lg">
+                        {c.name[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-heading font-black text-foreground truncate">{c.name}</h3>
+                        <p className="text-xs text-muted-foreground font-semibold">C-{c.id.toString().padStart(4, "0")}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-2 text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground truncate">
+                        <Mail className="w-3.5 h-3.5" />
+                        {c.email}
+                      </div>
+                      {c.phone && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Phone className="w-3.5 h-3.5" />
+                          {c.phone}
+                        </div>
+                      )}
+                      <div className="flex items-start gap-2 text-muted-foreground">
+                        <Car className="w-3.5 h-3.5 mt-0.5" />
+                        <div className="flex-1 text-xs">
+                          {c.vehicles && c.vehicles.length > 0 ? (
+                            c.vehicles.map((v, idx) => (
+                              <div key={idx} className="font-bold text-foreground">
+                                {v.make} {v.model} ({v.licensePlate})
+                              </div>
+                            ))
+                          ) : (
+                            <span className="italic text-muted-foreground/60">No vehicle registered</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/50 flex justify-between items-center text-xs">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                      Loyalty Points
+                    </span>
+                    <span className="font-black text-foreground">{c.loyaltyPoints} PTS</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

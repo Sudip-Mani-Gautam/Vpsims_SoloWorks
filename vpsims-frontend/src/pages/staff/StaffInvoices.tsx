@@ -4,8 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Send, FileText, Mail, Loader2, CheckCircle, Clock } from "lucide-react";
+import { Send, FileText, Mail, Loader2, CheckCircle, Clock, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 interface Order {
   id: number;
@@ -55,9 +56,14 @@ const StaffInvoices = () => {
 
     return (
         <div className="space-y-6">
-            <div className="space-y-1">
-                <h1 className="text-3xl font-heading font-black tracking-tight text-foreground">Financial Ledger</h1>
-                <p className="text-muted-foreground font-medium">Verify transaction status and dispatch professional customer invoices.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-heading font-black tracking-tight text-foreground">Financial Ledger</h1>
+                    <p className="text-muted-foreground font-medium">Verify transaction status and dispatch professional customer invoices.</p>
+                </div>
+                <Button className="bg-primary hover:bg-primary/95 text-white font-bold text-xs h-9 px-4 shrink-0" asChild>
+                    <Link to="./new"><Plus className="w-4 h-4 mr-1.5" /> New Invoice</Link>
+                </Button>
             </div>
             
             <Card className="glass-card shadow-xl border-border/40 overflow-hidden">
