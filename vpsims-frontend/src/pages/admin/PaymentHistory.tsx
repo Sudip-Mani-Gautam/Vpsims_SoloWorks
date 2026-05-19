@@ -93,7 +93,7 @@ const PaymentHistory = () => {
         </div>
       </div>
 
-      <Card className="border border-border rounded-2xl overflow-hidden bg-card shadow-sm">
+      <Card className="border border-border rounded-xl overflow-hidden bg-card shadow-sm">
         <CardContent className="p-0">
           {loading ? (
             <div className="py-32 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" /></div>

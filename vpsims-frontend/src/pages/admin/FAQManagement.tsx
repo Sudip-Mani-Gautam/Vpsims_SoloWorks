@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface FAQ {
   id: number;
@@ -173,12 +174,18 @@ const FAQManagement = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2 opacity-50" />
-                    <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Loading FAQs...</p>
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i} className="h-20">
+                    <TableCell className="pl-8"><Skeleton className="h-4 w-12" /></TableCell>
+                    <TableCell>
+                      <Skeleton className="h-5 w-48 mb-2" />
+                      <Skeleton className="h-4 w-64" />
+                    </TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
+                    <TableCell className="pr-8 text-right"><div className="flex justify-end gap-3"><Skeleton className="w-5 h-5 rounded" /><Skeleton className="w-5 h-5 rounded" /></div></TableCell>
+                  </TableRow>
+                ))
               ) : faqs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-64 text-center">

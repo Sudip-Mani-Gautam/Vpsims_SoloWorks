@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { 
+import { useNavigate } from 'react-router-dom';
+import {
   Package, Search, Loader2, CheckCircle2, 
   XCircle, Clock, Filter, Eye, Trash2,
   Mail, MessageSquare, AlertCircle, User
@@ -28,6 +28,7 @@ interface PartRequest {
   description: string;
   status: string;
   createdAt: string;
+  imageUrl?: string;
 }
 
 const PartRequestManagement = () => {
@@ -35,7 +36,7 @@ const PartRequestManagement = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [selectedRequest, setSelectedRequest] = useState<PartRequest | null>(null);
+  const navigate = useNavigate();
   const [updating, setUpdating] = useState<number | null>(null);
 
   const fetchRequests = async () => {
@@ -58,7 +59,6 @@ const PartRequestManagement = () => {
       await api.patch(`/partrequest/${id}/status`, { status: newStatus });
       toast.success(`Status updated to ${newStatus}`);
       fetchRequests();
-      if (selectedRequest?.id === id) setSelectedRequest(null);
     } catch {
       toast.error("Status update failed.");
     } finally {
@@ -201,7 +201,7 @@ const PartRequestManagement = () => {
                     </TableCell>
                     <TableCell className="pr-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg" onClick={() => setSelectedRequest(req)}>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg" onClick={() => navigate(`/admin/part-requests/${req.id}`, { state: { req } })}>
                           <Eye className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded-lg" onClick={() => handleDelete(req.id)}>
@@ -216,73 +216,6 @@ const PartRequestManagement = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* ── Details Dialog (Optimized) ── */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
-        <DialogContent className="max-w-md bg-card border-border shadow-2xl rounded-2xl p-0 overflow-hidden">
-          <DialogHeader className="p-6 bg-muted/10 border-b border-border">
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-primary" /> Request Context
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedRequest && (
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-1">
-                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Customer</p>
-                   <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center border border-border"><User className="w-4 h-4" /></div>
-                      <span className="text-xs font-bold">{selectedRequest.userName}</span>
-                   </div>
-                </div>
-                <div className="space-y-1">
-                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Current Status</p>
-                   <Badge className={cn("text-[10px] font-black uppercase border-none", getStatusColor(selectedRequest.status))}>{selectedRequest.status}</Badge>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-muted/20 border border-border space-y-4">
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-0.5">
-                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Part Name</p>
-                       <p className="text-sm font-black text-primary">{selectedRequest.partName} x{selectedRequest.quantity}</p>
-                    </div>
-                    <div className="space-y-0.5">
-                       <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Vehicle</p>
-                       <p className="text-xs font-bold">{selectedRequest.vehicleModel}</p>
-                    </div>
-                 </div>
-                 {selectedRequest.partNumber && (
-                   <div className="space-y-0.5">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Manufacturer PN</p>
-                      <p className="text-xs font-mono font-bold">{selectedRequest.partNumber}</p>
-                   </div>
-                 )}
-                 <div className="pt-2 border-t border-border/50">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">User Description</p>
-                    <p className="text-xs font-medium leading-relaxed italic text-muted-foreground mt-1">"{selectedRequest.description}"</p>
-                 </div>
-              </div>
-
-              <div className="space-y-2">
-                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quick Actions</p>
-                 <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="text-[11px] font-bold h-8 rounded-lg" onClick={() => handleUpdateStatus(selectedRequest.id, 'Procuring')}>Procuring</Button>
-                    <Button size="sm" variant="outline" className="text-[11px] font-bold h-8 rounded-lg border-emerald-500/20 text-emerald-600" onClick={() => handleUpdateStatus(selectedRequest.id, 'Available')}>Mark Available</Button>
-                    <Button size="sm" variant="outline" className="text-[11px] font-bold h-8 rounded-lg border-red-500/20 text-red-600" onClick={() => handleUpdateStatus(selectedRequest.id, 'Rejected')}>Reject</Button>
-                    <Button size="sm" variant="outline" className="text-[11px] font-bold h-8 rounded-lg" asChild>
-                       <a href={`mailto:?subject=Part Request: ${selectedRequest.partName}`}><Mail className="w-3.5 h-3.5 mr-1" /> Email Customer</a>
-                    </Button>
-                 </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="p-4 bg-muted/5 border-t border-border">
-             <Button variant="ghost" onClick={() => setSelectedRequest(null)} className="w-full text-xs font-bold">Dismiss Details</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

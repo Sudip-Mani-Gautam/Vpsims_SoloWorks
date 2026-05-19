@@ -84,6 +84,14 @@ const InventoryManagement = () => {
   const [previewUrl, setPreviewUrl] = useState('');
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importForm, setImportForm] = useState({
+    supplierId: '',
+    partId: '',
+    quantity: '1',
+    urgency: 'Medium'
+  });
+  const [importing, setImporting] = useState(false);
 
   const load = async () => {
     try {
@@ -95,7 +103,7 @@ const InventoryManagement = () => {
       setSuppliers(suppRes.data);
     } catch (e: any) {
       console.error(e);
-      toast.error("Failed to synchronize distributed warehouse data.");
+      toast.error("Failed to load inventory data.");
     } finally {
       setLoading(false);
     }
@@ -177,16 +185,16 @@ const InventoryManagement = () => {
       const config = { headers: { 'Content-Type': 'multipart/form-data' } };
       if (editingPart) {
         await api.put(`/part/${editingPart.id}`, formData, config);
-        toast.success("Inventory component updated.");
+        toast.success("Part updated successfully.");
       } else {
         await api.post('/part', formData, config);
-        toast.success("New component registered in the ledger.");
+        toast.success("Part added to inventory.");
       }
       setIsModalOpen(false);
       load();
     } catch (err: any) {
       const data = err.response?.data;
-      let msg = 'Technical registration error.';
+      let msg = 'Failed to save part.';
       if (data?.message) msg = data.message;
       else if (data?.errors) msg = Object.values(data.errors).flat()[0] as string;
       toast.error(msg);
@@ -195,14 +203,38 @@ const InventoryManagement = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Decommission this inventory item?')) return;
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importForm.partId || !importForm.quantity) {
+      toast.error("Please select a part and specify quantity.");
+      return;
+    }
+
+    setImporting(true);
     try {
-      await api.delete(`/part/${id}`);
-      toast.success("Component removed from system.");
+      await api.post(`/part/${importForm.partId}/import`, {
+        quantity: parseInt(importForm.quantity),
+        urgency: importForm.urgency
+      });
+      toast.success("Inventory stock successfully imported from vendor.");
+      setIsImportModalOpen(false);
+      setImportForm({ supplierId: '', partId: '', quantity: '1', urgency: 'Medium' });
       load();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Decommission failed.');
+      toast.error(err.response?.data?.message || "Failed to import stock from vendor.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this part from inventory?')) return;
+    try {
+      await api.delete(`/part/${id}`);
+      toast.success("Part deleted.");
+      load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to delete part.');
     }
   };
 
@@ -215,103 +247,108 @@ const InventoryManagement = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-heading font-black tracking-tight text-foreground">Parts Inventory</h1>
-          <p className="text-muted-foreground font-medium">Manage and monitor your distributed spare parts ledger.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Parts Inventory</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage and track your spare parts stock.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="hidden sm:flex hover-lift shadow-sm">
-            <Download className="w-4 h-4 mr-2" /> Export
+          <Button variant="outline" size="sm" className="hidden sm:flex gap-2">
+            <Download className="w-4 h-4" /> Export
           </Button>
           {canEdit && (
-            <Button onClick={handleOpenAdd} className="bg-primary text-white hover:bg-primary/90 font-bold shadow-lg shadow-primary/20 hover-lift">
-              <Plus className="w-4 h-4 mr-2" /> Add Component
-            </Button>
+            <>
+              <Button onClick={() => setIsImportModalOpen(true)} size="sm" variant="outline" className="gap-2">
+                <Truck className="w-4 h-4" /> Import from Vendor
+              </Button>
+              <Button onClick={handleOpenAdd} size="sm" className="gap-2">
+                <Plus className="w-4 h-4" /> Add Part
+              </Button>
+            </>
           )}
         </div>
       </div>
 
-      <div className="relative max-w-md shadow-sm rounded-xl overflow-hidden group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-        <Input 
-          className="pl-11 h-11 bg-card border-border/50 focus:border-primary transition-all duration-300" 
-          placeholder="Search by SKU, Name or Description..." 
-          value={search} 
-          onChange={(e) => setSearch(e.target.value)} 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          className="pl-9 h-9"
+          placeholder="Search by SKU or name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      <Card className="glass-card shadow-xl overflow-hidden border-border/40">
+      <Card>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="font-bold text-xs uppercase tracking-wider pl-6">SKU</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider">Component Identity</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider">Classification</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider">Distributor</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-center">Visual Asset</TableHead>
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-center">In-Stock</TableHead>
-                {isAdmin && <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Cost Price (NPR)</TableHead>}
-                <TableHead className="font-bold text-xs uppercase tracking-wider text-right">Selling Price (NPR)</TableHead>
-                {isAdmin && <TableHead className="font-bold text-xs uppercase tracking-wider text-right text-success">Profit (NPR)</TableHead>}
-                {canEdit && <TableHead className="font-bold text-xs uppercase tracking-wider text-right pr-6">Actions</TableHead>}
+            <TableHeader>
+              <TableRow className="border-b border-border">
+                <TableHead className="text-xs font-medium text-muted-foreground pl-5 w-[110px]">SKU</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Category</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground">Supplier</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-center">Image</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-center">Stock</TableHead>
+                {isAdmin && <TableHead className="text-xs font-medium text-muted-foreground text-right">Cost (NPR)</TableHead>}
+                <TableHead className="text-xs font-medium text-muted-foreground text-right">Price (NPR)</TableHead>
+                {isAdmin && <TableHead className="text-xs font-medium text-muted-foreground text-right">Profit (NPR)</TableHead>}
+                {canEdit && <TableHead className="text-xs font-medium text-muted-foreground text-right pr-5">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={canEdit ? 9 : 8} className="h-64 text-center">
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                        <Loader2 className="w-10 h-10 animate-spin text-primary opacity-50" />
-                        <p className="text-muted-foreground font-medium animate-pulse">Synchronizing ledger...</p>
+                  <TableCell colSpan={canEdit ? 9 : 8} className="h-40 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Loading parts...</p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={canEdit ? 9 : 8} className="h-64 text-center">
-                        <p className="text-muted-foreground font-medium">No components found matching your search criteria.</p>
-                    </TableCell>
+                  <TableCell colSpan={canEdit ? 9 : 8} className="h-32 text-center text-sm text-muted-foreground">
+                    No parts found.
+                  </TableCell>
                 </TableRow>
               ) : filtered.map((p) => (
-                <TableRow key={p.id} className="hover:bg-muted/20 transition-colors">
-                  <TableCell className="pl-6"><code className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-md">{p.sku}</code></TableCell>
-                  <TableCell className="font-bold text-foreground">{p.name}</TableCell>
-                  <TableCell><Badge variant="outline" className="bg-background font-bold text-[10px] uppercase">{p.categoryName}</Badge></TableCell>
+                <TableRow key={p.id} className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors">
+                  <TableCell className="pl-5 font-mono text-xs text-primary font-medium">{p.sku}</TableCell>
+                  <TableCell className="text-sm font-medium text-foreground">{p.name}</TableCell>
+                  <TableCell><span className="text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5">{p.categoryName}</span></TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                        <Truck className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs font-medium text-foreground">{p.supplierName}</span>
+                    <div className="flex items-center gap-1.5">
+                      <Truck className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-foreground">{p.supplierName}</span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-center">
-                        <div className="w-10 h-10 rounded-lg border border-border/50 overflow-hidden shadow-sm bg-muted/30 flex items-center justify-center">
-                            {p.imageUrl ? (
-                                <img src={getFullImageUrl(p.imageUrl)!} alt="" className="w-full h-full object-cover transition-transform hover:scale-125 cursor-zoom-in" />
-                            ) : (
-                                <Package className="w-4 h-4 text-muted-foreground opacity-50" />
-                            )}
-                        </div>
+                      <div className="w-9 h-9 rounded-md border border-border overflow-hidden bg-muted/30 flex items-center justify-center">
+                        {p.imageUrl ? (
+                          <img src={getFullImageUrl(p.imageUrl)!} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <Package className="w-4 h-4 text-muted-foreground/40" />
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${(p.stockQuantity ?? 0) < (p.minimumStockAlertLevel ?? 5) ? "bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-success shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse"}`} />
-                        <span className="font-black text-foreground tabular-nums">{p.stockQuantity ?? 0}</span>
-                        {(p.stockQuantity ?? 0) < (p.minimumStockAlertLevel ?? 5) && <AlertTriangle className="w-3.5 h-3.5 text-warning" />}
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${(p.stockQuantity ?? 0) < (p.minimumStockAlertLevel ?? 5) ? "bg-red-500" : "bg-green-500"}`} />
+                      <span className="text-sm font-medium tabular-nums">{p.stockQuantity ?? 0}</span>
+                      {(p.stockQuantity ?? 0) < (p.minimumStockAlertLevel ?? 5) && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
                     </div>
                   </TableCell>
-                  {isAdmin && <TableCell className="text-right font-black tabular-nums text-muted-foreground">NPR {(p.costPrice ?? 0).toLocaleString()}</TableCell>}
-                  <TableCell className="text-right font-black tabular-nums text-primary">NPR {(p.sellingPrice ?? 0).toLocaleString()}</TableCell>
-                  {isAdmin && <TableCell className="text-right font-black tabular-nums text-success">NPR {((p.sellingPrice ?? 0) - (p.costPrice ?? 0)).toLocaleString()}</TableCell>}
+                  {isAdmin && <TableCell className="text-right text-sm tabular-nums text-muted-foreground">NPR {(p.costPrice ?? 0).toLocaleString()}</TableCell>}
+                  <TableCell className="text-right text-sm font-medium tabular-nums text-foreground">NPR {(p.sellingPrice ?? 0).toLocaleString()}</TableCell>
+                  {isAdmin && <TableCell className="text-right text-sm font-medium tabular-nums text-green-600">NPR {((p.sellingPrice ?? 0) - (p.costPrice ?? 0)).toLocaleString()}</TableCell>}
                   {canEdit && (
-                    <TableCell className="text-right pr-6">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => handleOpenEdit(p)}><Edit2 className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors text-destructive/70" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <TableCell className="text-right pr-5">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleOpenEdit(p)}><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600" onClick={() => handleDelete(p.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   )}
@@ -323,33 +360,33 @@ const InventoryManagement = () => {
       </Card>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl border-white/10 shadow-2xl rounded-2xl overflow-hidden glass-card p-0 gap-0">
-          <DialogHeader className="p-6 pb-4 border-b border-border/50 bg-muted/10">
-            <DialogTitle className="text-2xl font-heading font-bold">{editingPart ? 'Update Inventory Item' : 'New Component Registration'}</DialogTitle>
-            <DialogDescription>Provide technical specifications and visual mapping for the warehouse ledger.</DialogDescription>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingPart ? 'Edit Part' : 'Add New Part'}</DialogTitle>
+            <DialogDescription>{editingPart ? 'Update the details for this part.' : 'Fill in the details to add a new part to inventory.'}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4 md:col-span-2">
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Official Component Name</Label>
+                            <Label className="text-sm font-medium">Part Name</Label>
                             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="e.g., Performance Brake Pad Set" className="bg-background/50" />
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Reference SKU</Label>
+                        <Label className="text-sm font-medium">SKU</Label>
                         <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required placeholder="REF-XXXX" className="bg-background/50" />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 md:col-span-2">
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Brand</Label>
+                            <Label className="text-sm font-medium">Brand</Label>
                             <Input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="e.g. Bosch" className="bg-background/50" />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Compatible Vehicle Model</Label>
+                            <Label className="text-sm font-medium">Compatible Vehicle</Label>
                             <Input value={form.compatibleVehicleModel} onChange={(e) => setForm({ ...form, compatibleVehicleModel: e.target.value })} placeholder="e.g. Toyota Corolla 2020" className="bg-background/50" />
                         </div>
                     </div>
@@ -366,7 +403,7 @@ const InventoryManagement = () => {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Rack / Shelf Location</Label>
+                        <Label className="text-sm font-medium">Rack / Shelf Location</Label>
                         <Input value={form.rackLocation} onChange={(e) => setForm({ ...form, rackLocation: e.target.value })} placeholder="e.g. A-12" className="bg-background/50" />
                     </div>
 
@@ -375,11 +412,11 @@ const InventoryManagement = () => {
                             <h3 className="text-sm font-bold uppercase tracking-widest text-primary">Vendor Pricing Details</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Cost Price (CP)</Label>
+                                    <Label className="text-sm font-medium">Cost Price (NPR)</Label>
                                     <Input type="number" step="0.01" value={form.costPrice} onChange={(e) => setForm({ ...form, costPrice: e.target.value })} required placeholder="0.00" className="bg-background/50" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Margin Type</Label>
+                                    <Label className="text-sm font-medium">Margin Type</Label>
                                     <select className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" value={form.marginType} onChange={(e) => setForm({ ...form, marginType: e.target.value })}>
                                         <option value="Percentage">Percentage (%)</option>
                                         <option value="Fixed Amount">Fixed Amount</option>
@@ -389,40 +426,40 @@ const InventoryManagement = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 {form.marginType === 'Percentage' ? (
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Margin Percentage (%)</Label>
+                                        <Label className="text-sm font-medium">Margin (%)</Label>
                                         <Input type="number" step="0.01" value={form.marginPercentage} onChange={(e) => setForm({ ...form, marginPercentage: e.target.value })} placeholder="0" className="bg-background/50" />
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
-                                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Margin Amount</Label>
+                                        <Label className="text-sm font-medium">Margin Amount (NPR)</Label>
                                         <Input type="number" step="0.01" value={form.marginAmount} onChange={(e) => setForm({ ...form, marginAmount: e.target.value })} placeholder="0.00" className="bg-background/50" />
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Selling Price (SP)</Label>
+                                    <Label className="text-sm font-medium">Selling Price (NPR)</Label>
                                     <Input type="number" step="0.01" value={form.sellingPrice} onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })} placeholder="Override calculated SP" className="bg-background/50" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Min Order Qty</Label>
+                                    <Label className="text-sm font-medium">Min Order Qty</Label>
                                     <Input type="number" value={form.minimumOrderQuantity} onChange={(e) => setForm({ ...form, minimumOrderQuantity: e.target.value })} placeholder="1" className="bg-background/50" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Delivery Time</Label>
+                                    <Label className="text-sm font-medium">Delivery Time</Label>
                                     <Input value={form.deliveryTime} onChange={(e) => setForm({ ...form, deliveryTime: e.target.value })} placeholder="e.g. 2-3 Days" className="bg-background/50" />
                                 </div>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-2 md:col-span-2">
-                            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Selling Price (NPR)</Label>
+                            <Label className="text-sm font-medium">Selling Price (NPR)</Label>
                             <Input type="number" step="0.01" value={form.sellingPrice} onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })} required placeholder="0.00" className="bg-background/50" />
                         </div>
                     )}
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Product Category</Label>
+                        <Label className="text-sm font-medium">Category</Label>
                         <select className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} required>
                             <option value="">Select Category...</option>
                             {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -430,7 +467,7 @@ const InventoryManagement = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Primary source supplier</Label>
+                        <Label className="text-sm font-medium">Supplier</Label>
                         <select className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })} required>
                             <option value="">Select Company...</option>
                             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -438,7 +475,7 @@ const InventoryManagement = () => {
                     </div>
 
                     <div className="space-y-4 md:col-span-2">
-                         <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Visual Asset Mapping</Label>
+                         <Label className="text-sm font-medium">Product Image</Label>
                          <div className="p-4 rounded-xl border border-dashed border-border flex items-center gap-6 bg-muted/10">
                              <div className="w-24 h-24 rounded-lg bg-card border border-border shadow-inner flex items-center justify-center overflow-hidden">
                                 {previewUrl ? <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon className="w-8 h-8 opacity-10" />}
@@ -454,7 +491,7 @@ const InventoryManagement = () => {
                                     <span className="text-xs text-muted-foreground truncate max-w-[150px]">{imageFile ? imageFile.name : 'No file selected'}</span>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] text-muted-foreground uppercase">...or Cloud Image Asset URL</Label>
+                                    <Label className="text-xs text-muted-foreground">Or paste an image URL</Label>
                                     <Input value={form.imageUrl} onChange={(e) => { setForm({ ...form, imageUrl: e.target.value }); setImageFile(null); setPreviewUrl(e.target.value); }} placeholder="https://..." className="h-8 text-xs bg-background/30" />
                                 </div>
                              </div>
@@ -462,15 +499,96 @@ const InventoryManagement = () => {
                     </div>
 
                     <div className="space-y-2 md:col-span-2">
-                        <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Technical Specification Summary</Label>
-                        <textarea className="flex min-h-[100px] w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Detail performance metrics and specifications..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                        <Label className="text-sm font-medium">Description / Notes</Label>
+                        <textarea className="flex min-h-[80px] w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" placeholder="Optional notes or description..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                     </div>
                 </div>
             </div>
-            <DialogFooter className="p-6 bg-muted/5 border-t border-border/50">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel Sector Action</Button>
-              <Button type="submit" className="bg-primary text-white hover:bg-primary/90 font-bold shadow-lg shadow-primary/20" disabled={submitting}>
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : editingPart ? 'Update Component' : 'Finalize Registration'}
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : editingPart ? 'Save Changes' : 'Add Part'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import from Vendor</DialogTitle>
+            <DialogDescription>
+              Order and import parts directly into the inventory stock from active vendors.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleImportSubmit} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Select Vendor</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={importForm.supplierId}
+                onChange={(e) => setImportForm({ ...importForm, supplierId: e.target.value, partId: '' })}
+                required
+              >
+                <option value="">-- Select Vendor --</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Select Part</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={importForm.partId}
+                onChange={(e) => setImportForm({ ...importForm, partId: e.target.value })}
+                required
+                disabled={!importForm.supplierId}
+              >
+                <option value="">
+                  {importForm.supplierId ? "-- Select Part --" : "-- Select a vendor first --"}
+                </option>
+                {parts
+                  .filter((p) => p.supplierId === parseInt(importForm.supplierId))
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} (SKU: {p.sku})</option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Quantity</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={importForm.quantity}
+                  onChange={(e) => setImportForm({ ...importForm, quantity: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Urgency</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  value={importForm.urgency}
+                  onChange={(e) => setImportForm({ ...importForm, urgency: e.target.value })}
+                  required
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsImportModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={importing || !importForm.partId}>
+                {importing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : 'Import Stock'}
               </Button>
             </DialogFooter>
           </form>
