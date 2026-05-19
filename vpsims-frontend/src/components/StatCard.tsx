@@ -23,20 +23,20 @@ const StatCard = ({ title, value, icon, trend, trendUp, variant = 'primary' }: S
   const { icon: iconClass } = variantConfig[variant];
 
   return (
-    <Card className="card-standard hover-lift">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-2.5">
-          <p className="text-overline">{title}</p>
-          <div className={cn("w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0", iconClass)}>
+    <Card className="bg-card text-card-foreground border shadow-sm transition-all hover:shadow-md">
+      <CardContent className="p-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</p>
+          <div className={cn("w-7 h-7 rounded-lg border flex items-center justify-center flex-shrink-0", iconClass)}>
             {icon}
           </div>
         </div>
-        <div className="text-xl font-bold text-foreground tracking-tight leading-none" style={{ fontFamily: "var(--font-heading)" }}>
+        <div className="text-lg font-black text-foreground tracking-tight leading-none" style={{ fontFamily: "var(--font-heading)" }}>
           {value}
         </div>
         {trend && (
-          <p className={cn("text-[11px] font-semibold mt-2 flex items-center gap-1", trendUp ? "text-emerald-600" : "text-red-500")}>
-            <span className={cn("inline-flex items-center justify-center w-3.5 h-3.5 rounded text-[9px]", trendUp ? "bg-emerald-100 dark:bg-emerald-900" : "bg-red-100 dark:bg-red-900")}>
+          <p className={cn("text-[10px] font-bold mt-1.5 flex items-center gap-1", trendUp ? "text-emerald-600" : "text-red-500")}>
+            <span className={cn("inline-flex items-center justify-center w-3 h-3 rounded text-[8px]", trendUp ? "bg-emerald-100 dark:bg-emerald-900" : "bg-red-100 dark:bg-red-900")}>
               {trendUp ? "↑" : "↓"}
             </span>
             {trend}

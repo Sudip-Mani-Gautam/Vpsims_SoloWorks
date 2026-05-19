@@ -2,13 +2,15 @@ import { useState, useRef } from "react";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 interface AvatarUploaderProps {
   initials: string;
   size?: "sm" | "md" | "lg" | "xl";
+  ringClass?: string;
 }
 
-const AvatarUploader = ({ initials, size = "xl" }: AvatarUploaderProps) => {
+const AvatarUploader = ({ initials, size = "xl", ringClass }: AvatarUploaderProps) => {
   const { user, updateAvatar } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -61,7 +63,11 @@ const AvatarUploader = ({ initials, size = "xl" }: AvatarUploaderProps) => {
   return (
     <div className="flex flex-col items-center gap-4">
       <div 
-        className={`relative rounded-full overflow-hidden flex items-center justify-center font-bold shadow-lg transition-all border-4 bg-muted text-muted-foreground border-background cursor-pointer group ${sizeClasses[size]}`}
+        className={cn(
+          "relative rounded-full overflow-hidden flex items-center justify-center font-bold shadow-lg transition-all border-4 bg-muted text-muted-foreground border-background cursor-pointer group",
+          sizeClasses[size],
+          ringClass && `ring-4 ring-background ${ringClass}`
+        )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => !isUploading && fileInputRef.current?.click()}

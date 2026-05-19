@@ -35,11 +35,20 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-icon-wrapper">
-          <Settings size={20} strokeWidth={2.5} />
-        </div>
-        <span className="brand-text">VPSIMS</span>
+      <div className="sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '20px 16px' }}>
+        <img 
+          src="/icon.png" 
+          alt="VPSIMS" 
+          style={{ 
+            width: '32px', 
+            height: '32px', 
+            borderRadius: '6px', 
+            backgroundColor: 'white',
+            padding: '4px',
+            display: 'block'
+          }} 
+        />
+        <span className="brand-text" style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.5px' }}>VPSIMS</span>
       </div>
 
       <div className="nav-section">

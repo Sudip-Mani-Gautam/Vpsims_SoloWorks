@@ -115,4 +115,15 @@ erDiagram
 | **Member 5** | Support Ticket System, FAQ Management, Review Moderation |
 
 ---
-*Date: April 28, 2026*
+
+### f) References
+
+1. Microsoft. (2026). *ASP.NET Core Documentation*. Retrieved from https://learn.microsoft.com/en-us/aspnet/core
+2. Meta Platforms, Inc. (2026). *React – A JavaScript library for building user interfaces*. Retrieved from https://react.dev
+3. Tailwind Labs. (2026). *Tailwind CSS - Rapidly build modern websites without ever leaving your HTML*. Retrieved from https://tailwindcss.com
+4. Shadcn. (2026). *shadcn/ui - Beautifully designed components that you can copy and paste into your apps*. Retrieved from https://ui.shadcn.com
+5. Recharts. (2026). *Recharts - A composable charting library built on React components*. Retrieved from https://recharts.org
+6. Vite. (2026). *Vite - Next Generation Frontend Tooling*. Retrieved from https://vitejs.dev
+
+---
+*Date: April 29, 2026*

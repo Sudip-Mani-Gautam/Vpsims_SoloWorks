@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,14 +21,19 @@ import BookingApproval from "@/pages/admin/BookingApproval";
 import PaymentHistory from "@/pages/admin/PaymentHistory";
 import PaymentDetailsManagement from "@/pages/admin/PaymentDetailsManagement";
 import PurchaseInvoices from "@/pages/admin/PurchaseInvoices";
+import SalesInvoices from "@/pages/admin/SalesInvoices";
+import NewSalesInvoice from "@/pages/admin/NewSalesInvoice";
 import StaffManagement from "@/pages/admin/StaffManagement";
 import BranchManagement from "@/pages/admin/BranchManagement";
 import BranchConfiguration from "@/pages/admin/BranchConfiguration";
 import ReviewModeration from "@/pages/admin/ReviewModeration";
 import PartRequestManagement from "@/pages/admin/PartRequestManagement";
+import PartRequestDetails from "@/pages/admin/PartRequestDetails";
 import FAQManagement from "@/pages/admin/FAQManagement";
 import AdminSupportManagement from "@/pages/admin/AdminSupportManagement";
 import SupportTicketDetail from "@/pages/shared/SupportTicketDetail";
+import RevenueAnalytics from "@/pages/admin/RevenueAnalytics";
+import AdminAIPredictions from "@/pages/admin/AdminAIPredictions";
 
 // --- Staff Pages ---
 import SalesPage from "@/pages/staff/SalesPage";
@@ -44,6 +49,7 @@ import TodaysSalesPage from "@/pages/staff/TodaysSalesPage";
 import CustomersServedPage from "@/pages/staff/CustomersServedPage";
 import InvoicesCreatedPage from "@/pages/staff/InvoicesCreatedPage";
 import StaffPaymentView from "@/pages/staff/StaffPaymentView";
+import StaffNotifications from "@/pages/staff/StaffNotifications";
 
 // --- Customer Pages ---
 import AboutPage from "@/pages/customer/AboutPage";
@@ -59,15 +65,28 @@ import PredictionsPage from "@/pages/customer/PredictionsPage";
 import ProfilePage from "@/pages/customer/ProfilePage";
 import RequestPartsPage from "@/pages/customer/RequestPartsPage";
 import ReviewsPage from "@/pages/customer/ReviewsPage";
+import OperatingProcedures from "@/pages/legal/OperatingProcedures";
+import SecurityProtocols from "@/pages/legal/SecurityProtocols";
 
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
   const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
+
+  // Public Legal Routes (accessible without login)
+  if (location.pathname.startsWith('/legal')) {
+    return (
+      <Routes>
+        <Route path="/legal/procedures" element={<OperatingProcedures />} />
+        <Route path="/legal/security" element={<SecurityProtocols />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
 
   if (!isAuthenticated) return <LoginPage />;
 
-  // Map roles to home routes
   const role = user?.role?.toLowerCase();
   const homeRoute = role === "admin" ? "/admin" : role === "staff" ? "/staff" : "/customer";
 
@@ -86,11 +105,17 @@ const AppRoutes = () => {
         <Route path="/admin/customers/:id" element={<CustomerDetailPage />} />
         <Route path="/admin/vendors" element={<VendorManagement />} />
         <Route path="/admin/inventory" element={<InventoryManagement />} />
-        <Route path="/admin/invoices" element={<PurchaseInvoices />} />
+        <Route path="/admin/sales-invoices">
+          <Route index element={<SalesInvoices />} />
+          <Route path="new" element={<NewSalesInvoice />} />
+        </Route>
+        <Route path="/admin/purchase-invoices" element={<PurchaseInvoices />} />
         <Route path="/admin/bookings" element={<BookingApproval />} />
         <Route path="/admin/payments" element={<PaymentDetailsManagement />} />
         <Route path="/admin/payment-history" element={<PaymentHistory />} />
         <Route path="/admin/reports" element={<AdminReports />} />
+        <Route path="/admin/ai-predictions" element={<AdminAIPredictions />} />
+        <Route path="/admin/revenue" element={<RevenueAnalytics />} />
         
         {/* Branches */}
         <Route path="/admin/branches">
@@ -100,6 +125,7 @@ const AppRoutes = () => {
         
         <Route path="/admin/reviews" element={<ReviewModeration />} />
         <Route path="/admin/part-requests" element={<PartRequestManagement />} />
+        <Route path="/admin/part-requests/:id" element={<PartRequestDetails />} />
         <Route path="/admin/activity-logs" element={<ActivityLogs />} />
         <Route path="/admin/faq" element={<FAQManagement />} />
         <Route path="/admin/support" element={<AdminSupportManagement />} />
@@ -118,12 +144,16 @@ const AppRoutes = () => {
         <Route path="/staff/credits" element={<CreditManagement />} />
         <Route path="/staff/bookings" element={<BookingApproval />} /> {/* Reusing admin components if applicable, but we have staff components. Wait, template uses /admin/bookings for admin. I'll use it since there wasn't a StaffBooking Approval */}
         <Route path="/staff/search" element={<SearchPage />} />
-        <Route path="/staff/invoices" element={<StaffInvoices />} />
+        <Route path="/staff/sales-invoices">
+          <Route index element={<StaffInvoices />} />
+          <Route path="new" element={<NewSalesInvoice />} />
+        </Route>
         <Route path="/staff/reports" element={<StaffReports />} />
         <Route path="/staff/support" element={<StaffSupportTickets />} />
         <Route path="/staff/faq" element={<FAQManagement />} />
         <Route path="/staff/support/:id" element={<SupportTicketDetail />} />
         <Route path="/staff/payments" element={<StaffPaymentView />} />
+        <Route path="/staff/notifications" element={<StaffNotifications />} />
         
         {/* --- Customer Sector --- */}
         <Route path="/customer" element={<CustomerDashboard />} />
@@ -158,7 +188,7 @@ const App = () => (
     <ThemeProvider>
       <TooltipProvider>
         <Toaster />
-        <Sonner position="top-right" richColors closeButton />
+        <Sonner position="bottom-right" richColors closeButton />
         <AuthProvider>
           <BrowserRouter>
             <AppRoutes />
