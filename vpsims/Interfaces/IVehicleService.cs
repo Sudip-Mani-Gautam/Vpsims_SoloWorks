@@ -8,6 +8,7 @@ namespace vpsims.Interfaces
         Task<VehicleDto?> GetByIdAsync(int id);
         Task<VehicleDto?> CreateAsync(CreateVehicleDto dto, string userRole, int currentUserId);
         Task<VehicleDto?> UpdateAsync(int id, CreateVehicleDto dto, string userRole, int currentUserId);
+        Task<VehicleDto?> UpdateStatusAsync(int id, string status, string userRole, int currentUserId);
         Task<bool> DeleteAsync(int id, string userRole, int currentUserId);
     }
 }

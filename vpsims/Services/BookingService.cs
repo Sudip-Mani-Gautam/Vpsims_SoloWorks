@@ -49,8 +49,9 @@ namespace vpsims.Services
 
         public async Task<int> GetSlotAvailabilityAsync(int branchId, DateTime date, string timeSlot)
         {
+            var utcDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
             var bookedCount = await _context.Bookings
-                .CountAsync(b => b.BranchId == branchId && b.ServiceDate.Date == date.Date && b.TimeSlot == timeSlot && b.Status != "Rejected" && b.Status != "Cancelled");
+                .CountAsync(b => b.BranchId == branchId && b.ServiceDate.Date == utcDate && b.TimeSlot == timeSlot && b.Status != "Rejected" && b.Status != "Cancelled");
             
             return Math.Max(0, MAX_USERS_PER_SLOT - bookedCount);
         }
@@ -66,7 +67,8 @@ namespace vpsims.Services
             if (!await _context.Branches.AnyAsync(b => b.Id == dto.BranchId)) return null;
 
             // Enforce max 5 users per slot limit
-            var availableSlots = await GetSlotAvailabilityAsync(dto.BranchId, dto.ServiceDate, dto.TimeSlot);
+            var utcServiceDate = DateTime.SpecifyKind(dto.ServiceDate.Date, DateTimeKind.Utc);
+            var availableSlots = await GetSlotAvailabilityAsync(dto.BranchId, utcServiceDate, dto.TimeSlot);
             if (availableSlots <= 0)
             {
                 throw new Exception("This time slot is fully booked.");
@@ -77,7 +79,7 @@ namespace vpsims.Services
                 UserId = dto.UserId,
                 BranchId = dto.BranchId,
                 VehicleId = dto.VehicleId,
-                ServiceDate = dto.ServiceDate.Date, // store Date only
+                ServiceDate = utcServiceDate,
                 TimeSlot = dto.TimeSlot,
                 ServiceNotes = dto.ServiceNotes,
                 Status = "Pending"

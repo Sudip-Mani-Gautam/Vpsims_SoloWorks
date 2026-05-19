@@ -3,6 +3,7 @@ using vpsims.Data;
 using vpsims.DTOs.Order;
 using vpsims.Interfaces;
 using vpsims.Models;
+using Hangfire;
 
 namespace vpsims.Services
 {
@@ -13,25 +14,31 @@ namespace vpsims.Services
         private readonly IEmailService _emailService;
         private readonly IPdfService _pdfService;
         private readonly IActivityLogService _activityLogService;
+        private readonly IBackgroundJobClient _backgroundJobClient;
 
-        public OrderService(AppDbContext context, INotificationService notificationService, IEmailService emailService, IPdfService pdfService, IActivityLogService activityLogService)
+        public OrderService(AppDbContext context, INotificationService notificationService, IEmailService emailService, IPdfService pdfService, IActivityLogService activityLogService, IBackgroundJobClient backgroundJobClient)
         {
             _context = context;
             _notificationService = notificationService;
             _emailService = emailService;
             _pdfService = pdfService;
             _activityLogService = activityLogService;
+            _backgroundJobClient = backgroundJobClient;
         }
 
         private static OrderDto ToDto(Order o) => new()
         {
             Id = o.Id,
             UserId = o.UserId,
-            CustomerName = o.User?.Name ?? "",
+            CustomerName = o.User?.Name ?? o.GuestName ?? "Guest Customer",
+            CustomerEmail = o.User?.Email ?? "",
+            CustomerPhone = o.User?.Phone ?? "",
+            GuestName = o.GuestName,
             TotalAmount = o.TotalAmount,
             Status = o.Status,
             PaymentStatus = o.PaymentStatus,
             AmountPaid = o.AmountPaid,
+            Notes = o.Notes,
             DueDate = o.DueDate,
             CreatedAt = o.CreatedAt,
             Items = o.OrderItems.Select(oi => new OrderItemDto
@@ -91,17 +98,22 @@ namespace vpsims.Services
 
             var order = new Order
             {
-                UserId = userId,
+                UserId = dto.UserId ?? userId,
+                GuestName = dto.GuestName,
                 TotalAmount = total,
                 Status = "Pending",
                 PaymentStatus = dto.PaymentStatus,
                 AmountPaid = dto.AmountPaid,
-                DueDate = dto.DueDate,
+                Notes = dto.Notes,
+                DueDate = dto.DueDate.HasValue ? DateTime.SpecifyKind(dto.DueDate.Value, DateTimeKind.Utc) : null,
                 OrderItems = items
             };
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
+
+            // Enqueue background email job automatically on creation
+            _backgroundJobClient.Enqueue<BackgroundJobs>(x => x.SendInvoiceEmailJob(order.Id));
 
             await _activityLogService.LogAsync(userId, "INVOICE_CREATED", $"Order #{order.Id} created with total NPR {order.TotalAmount:N2}.");
 
@@ -168,7 +180,37 @@ namespace vpsims.Services
 
             try
             {
-                await _emailService.SendInvoiceEmailAsync(order.User.Email, invoiceNumber, order.TotalAmount, itemsSummary);
+                if (order.PaymentStatus == "Paid")
+                {
+                    await _emailService.SendInvoiceEmailAsync(
+                        order.User.Email, 
+                        invoiceNumber, 
+                        order.TotalAmount, 
+                        itemsSummary, 
+                        order.PaymentStatus, 
+                        order.AmountPaid
+                    );
+                }
+                else if (order.DueDate.HasValue && DateTime.UtcNow > order.DueDate.Value)
+                {
+                    await _emailService.SendOverdueNoticeEmailAsync(
+                        order.User.Email, 
+                        invoiceNumber, 
+                        order.TotalAmount - order.AmountPaid, 
+                        itemsSummary, 
+                        order.DueDate
+                    );
+                }
+                else
+                {
+                    await _emailService.SendPaymentReminderEmailAsync(
+                        order.User.Email, 
+                        invoiceNumber, 
+                        order.TotalAmount, 
+                        itemsSummary, 
+                        order.DueDate
+                    );
+                }
                 return true;
             }
             catch

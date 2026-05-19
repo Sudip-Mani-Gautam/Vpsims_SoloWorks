@@ -27,7 +27,7 @@ namespace vpsims.Controllers
         }
 
         [HttpGet("all")]
-        [Authorize(Roles = "Admin,admin")]
+        [Authorize(Roles = "Admin,admin,Staff,staff")]
         public async Task<IActionResult> GetAllTickets()
         {
             var tickets = await _supportService.GetAllTicketsAsync();
@@ -79,16 +79,29 @@ namespace vpsims.Controllers
         }
 
         [HttpPatch("ticket/{id}/status")]
-        [Authorize(Roles = "Admin,admin,Staff,staff")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
         {
+            var ticket = await _supportService.GetTicketDetailAsync(id);
+            if (ticket == null) return NotFound();
+
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            // Security check: Only Admin, Staff, or the Owner of the ticket can change its status
+            if (role != "Admin" && role != "Staff" && ticket.UserId != userId)
+                return Forbid();
+
+            // Customer check: Customers should only be allowed to resolve or close their ticket
+            if (role != "Admin" && role != "Staff" && dto.Status != "Resolved" && dto.Status != "Closed")
+                return BadRequest("Customers can only mark tickets as resolved or closed.");
+
             var result = await _supportService.UpdateTicketStatusAsync(id, dto.Status);
             if (!result) return NotFound();
             return Ok(new { message = "Status updated" });
         }
 
         [HttpPatch("ticket/{id}/assign")]
-        [Authorize(Roles = "Admin,admin")]
+        [Authorize(Roles = "Admin,admin,Staff,staff")]
         public async Task<IActionResult> AssignTicket(int id, [FromBody] AssignTicketDto dto)
         {
             var result = await _supportService.AssignTicketAsync(id, dto.StaffId);

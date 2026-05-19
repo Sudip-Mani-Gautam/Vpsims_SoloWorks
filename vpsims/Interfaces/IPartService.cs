@@ -12,5 +12,6 @@ namespace vpsims.Interfaces
         Task<PartDto?> UpdateAsync(int id, UpdatePartDto dto);
         Task<bool> DeleteAsync(int id);
         Task<IEnumerable<PartDto>> SearchAsync(string query);
+        Task<PartDto?> ImportStockAsync(int id, int quantity, string urgency, int? userId);
     }
 }

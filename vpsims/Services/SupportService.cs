@@ -38,10 +38,13 @@ namespace vpsims.Services
             await AddMessageAsync(ticket.Id, userId, initialMessage, attachmentUrls);
 
             // Notify Admins
+            var creator = await _context.Users.FindAsync(userId);
+            var firstName = creator?.Name?.Split(' ')[0] ?? "A customer";
+            
             var admins = await _context.Users.Where(u => u.Role == "Admin").ToListAsync();
             foreach (var admin in admins)
             {
-                await _notificationService.CreateNotificationAsync(admin.Id, "New Support Ticket", $"Customer {userId} created a ticket: {subject}", "SUPPORT_TICKET_NEW", ticket.Id.ToString());
+                await _notificationService.CreateNotificationAsync(admin.Id, "New Support Ticket", $"{firstName} created a ticket: {subject}", "SUPPORT_TICKET_NEW", ticket.Id.ToString());
             }
 
             return ticket;
@@ -110,7 +113,8 @@ namespace vpsims.Services
                 // Notify Assigned Staff or Admin
                 if (ticket.AssignedStaffId.HasValue)
                 {
-                    await _notificationService.CreateNotificationAsync(ticket.AssignedStaffId.Value, "Customer Message", $"New message from customer on ticket #{ticket.Id}", "SUPPORT_MESSAGE_CUSTOMER", ticket.Id.ToString());
+                    var firstName = sender.Name?.Split(' ')[0] ?? "A customer";
+                    await _notificationService.CreateNotificationAsync(ticket.AssignedStaffId.Value, "Customer Message", $"New message from {firstName} on ticket #{ticket.Id}", "SUPPORT_MESSAGE_CUSTOMER", ticket.Id.ToString());
                 }
             }
 
@@ -229,10 +233,35 @@ namespace vpsims.Services
 
         public async Task<int> GetUnreadSupportCountAsync(int userId)
         {
-            // Unread messages on tickets where user is participant but not sender
-            return await _context.SupportMessages
-                .Include(m => m.Ticket)
-                .CountAsync(m => m.Ticket.UserId == userId && m.SenderId != userId && !m.IsRead);
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return 0;
+
+            if (user.Role == "Admin" || user.Role == "admin")
+            {
+                return await _context.SupportMessages
+                    .Where(m => !m.IsRead && _context.Users.Any(u => u.Id == m.SenderId && u.Role == "Customer"))
+                    .Select(m => m.SenderId)
+                    .Distinct()
+                    .CountAsync();
+            }
+            else if (user.Role == "Staff" || user.Role == "staff")
+            {
+                return await _context.SupportMessages
+                    .Include(m => m.Ticket)
+                    .Where(m => (m.Ticket.AssignedStaffId == userId || m.Ticket.AssignedStaffId == null) && !m.IsRead && _context.Users.Any(u => u.Id == m.SenderId && u.Role == "Customer"))
+                    .Select(m => m.SenderId)
+                    .Distinct()
+                    .CountAsync();
+            }
+            else
+            {
+                return await _context.SupportMessages
+                    .Include(m => m.Ticket)
+                    .Where(m => m.Ticket.UserId == userId && m.SenderId != userId && !m.IsRead)
+                    .Select(m => m.SenderId)
+                    .Distinct()
+                    .CountAsync();
+            }
         }
     }
 }

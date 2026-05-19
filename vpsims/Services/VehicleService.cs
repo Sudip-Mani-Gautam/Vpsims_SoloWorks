@@ -83,6 +83,22 @@ namespace vpsims.Services
             return MapToDto(vehicle);
         }
 
+        public async Task<VehicleDto?> UpdateStatusAsync(int id, string status, string userRole, int currentUserId)
+        {
+            var vehicle = await _context.Vehicles.Include(v => v.User).FirstOrDefaultAsync(v => v.Id == id);
+            if (vehicle == null) return null;
+
+            // Customers can only change their own vehicles
+            if (userRole == "Customer" && vehicle.UserId != currentUserId) return null;
+
+            if (!Enum.TryParse<VehicleStatus>(status, true, out var parsedStatus))
+                return null;
+
+            vehicle.Status = parsedStatus;
+            await _context.SaveChangesAsync();
+            return MapToDto(vehicle);
+        }
+
         public async Task<bool> DeleteAsync(int id, string userRole, int currentUserId)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
@@ -107,7 +123,8 @@ namespace vpsims.Services
                 Model = vehicle.Model,
                 Year = vehicle.Year,
                 LicensePlate = vehicle.LicensePlate,
-                VIN = vehicle.VIN
+                VIN = vehicle.VIN,
+                Status = vehicle.Status.ToString()
             };
         }
     }

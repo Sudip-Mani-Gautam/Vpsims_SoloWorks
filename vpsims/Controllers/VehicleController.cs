@@ -67,12 +67,23 @@ namespace vpsims.Controllers
             return Ok(vehicle);
         }
 
+        [HttpPatch("{id}/status")]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateVehicleStatusDto dto)
+        {
+            var role = User.FindFirstValue(ClaimTypes.Role)!;
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var vehicle = await _vehicleService.UpdateStatusAsync(id, dto.Status, role, userId);
+            if (vehicle == null) return NotFound();
+
+            return Ok(vehicle);
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var role = User.FindFirstValue(ClaimTypes.Role)!;
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
             var success = await _vehicleService.DeleteAsync(id, role, userId);
             if (!success) return NotFound();
 

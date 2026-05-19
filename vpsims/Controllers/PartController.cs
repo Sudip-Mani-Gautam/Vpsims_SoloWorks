@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using vpsims.DTOs.Part;
@@ -78,5 +79,22 @@ namespace vpsims.Controllers
             var success = await _partService.DeleteAsync(id);
             return success ? NoContent() : NotFound();
         }
+
+        [HttpPost("{id}/import")]
+        [Authorize(Roles = "Admin,Staff")]
+        public async Task<IActionResult> ImportStock(int id, [FromBody] ImportStockDto dto)
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            int? userId = string.IsNullOrEmpty(userIdStr) ? null : int.Parse(userIdStr);
+
+            var result = await _partService.ImportStockAsync(id, dto.Quantity, dto.Urgency, userId);
+            return result == null ? NotFound() : Ok(result);
+        }
+    }
+
+    public class ImportStockDto
+    {
+        public int Quantity { get; set; }
+        public string Urgency { get; set; } = "Low";
     }
 }

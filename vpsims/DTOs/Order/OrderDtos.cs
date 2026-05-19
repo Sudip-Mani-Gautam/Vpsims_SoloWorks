@@ -17,9 +17,12 @@ namespace vpsims.DTOs.Order
 
     public class CreateOrderDto
     {
+        public int? UserId { get; set; }
+        public string? GuestName { get; set; }
         public List<CreateOrderItemDto> Items { get; set; } = new();
         public decimal AmountPaid { get; set; } = 0;
         public string PaymentStatus { get; set; } = "Pending";
+        public string? Notes { get; set; }
         public DateTime? DueDate { get; set; }
     }
 
@@ -28,10 +31,14 @@ namespace vpsims.DTOs.Order
         public int Id { get; set; }
         public int UserId { get; set; }
         public string CustomerName { get; set; } = string.Empty;
+        public string CustomerEmail { get; set; } = string.Empty;
+        public string CustomerPhone { get; set; } = string.Empty;
+        public string? GuestName { get; set; }
         public decimal TotalAmount { get; set; }
         public string Status { get; set; } = string.Empty;
         public string PaymentStatus { get; set; } = string.Empty;
         public decimal AmountPaid { get; set; }
+        public string? Notes { get; set; }
         public DateTime? DueDate { get; set; }
         public DateTime CreatedAt { get; set; }
         public List<OrderItemDto> Items { get; set; } = new();

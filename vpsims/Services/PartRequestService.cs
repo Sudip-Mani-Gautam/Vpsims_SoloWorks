@@ -29,6 +29,7 @@ namespace vpsims.Services
             Priority = r.Priority,
             Description = r.Description,
             Status = r.Status,
+            ImageUrl = r.ImageUrl,
             CreatedAt = r.CreatedAt
         };
 
@@ -50,6 +51,7 @@ namespace vpsims.Services
                 Priority = dto.Priority,
                 Description = dto.Description,
                 Status = "Pending",
+                ImageUrl = dto.Image,
                 CreatedAt = DateTime.UtcNow
             };
 

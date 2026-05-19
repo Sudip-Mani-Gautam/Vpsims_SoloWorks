@@ -45,15 +45,6 @@ namespace vpsims.Controllers
             if (dto.Role != "Customer" && dto.Role != "Staff")
                 return BadRequest(new { message = "Invalid role specified." });
 
-            // 5. Enforce mandatory vehicle registration for customers (A-12)
-            if (dto.Role == "Customer")
-            {
-                if (string.IsNullOrEmpty(dto.VehicleMake) || string.IsNullOrEmpty(dto.VehicleModel))
-                {
-                    return BadRequest(new { message = "Institutional Policy: Vehicle Make and Model are mandatory for customer registration." });
-                }
-            }
-
             var result = await _authService.RegisterAsync(dto);
             if (result == null)
                 return BadRequest(new { message = "Email already exists." });

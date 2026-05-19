@@ -12,6 +12,7 @@ namespace vpsims.DTOs.PartRequest
         public string Priority { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = "Pending";
+        public string? ImageUrl { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
@@ -23,6 +24,7 @@ namespace vpsims.DTOs.PartRequest
         public int Quantity { get; set; }
         public string Priority { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string? Image { get; set; }
     }
 
     public class UpdatePartRequestStatusDto

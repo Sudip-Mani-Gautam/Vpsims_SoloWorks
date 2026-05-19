@@ -40,9 +40,9 @@ namespace vpsims.Controllers
             var amountToPay = order.TotalAmount - order.AmountPaid;
             if (amountToPay <= 0) return BadRequest("Order is already paid.");
 
-            var sessionId = await _stripeService.CreateCheckoutSessionAsync(order.Id, amountToPay, userEmail);
+            var session = await _stripeService.CreateCheckoutSessionAsync(order.Id, amountToPay, userEmail);
 
-            return Ok(new { sessionId, url = $"https://checkout.stripe.com/pay/{sessionId}" });
+            return Ok(new { sessionId = session.Id, url = session.Url });
         }
 
         [HttpPost("verify-payment")]

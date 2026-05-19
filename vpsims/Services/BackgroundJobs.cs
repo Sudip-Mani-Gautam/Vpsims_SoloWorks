@@ -43,21 +43,12 @@ namespace vpsims.Services
                 
                 try
                 {
-                    await _emailService.SendEmailAsync(
+                    await _emailService.SendOverdueNoticeEmailAsync(
                         order.User.Email,
-                        $"OVERDUE PAYMENT NOTICE: {invoiceNumber}",
-                        $@"
-                        <div style='font-family: Arial, sans-serif; padding: 20px; border: 2px solid #e74c3c; border-radius: 8px;'>
-                            <h2 style='color: #e74c3c;'>PAYMENT OVERDUE ADVISORY</h2>
-                            <p>Hello {order.User.Name},</p>
-                            <p>Our records indicate that invoice <strong>{invoiceNumber}</strong> is currently past its payment deadline.</p>
-                            <hr />
-                            <p><strong>Total Due:</strong> NPR {order.TotalAmount - order.AmountPaid:N2}</p>
-                            <p><strong>Overdue Since:</strong> {order.DueDate:dd MMM yyyy}</p>
-                            <hr />
-                            <p>Please settle the outstanding balance as soon as possible to avoid distribution delays.</p>
-                            <p>Thank you for your prompt attention.</p>
-                        </div>"
+                        invoiceNumber,
+                        order.TotalAmount - order.AmountPaid,
+                        itemsSummary,
+                        order.DueDate
                     );
                 }
                 catch (Exception ex)
@@ -111,6 +102,37 @@ namespace vpsims.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "BACKGROUND JOB CRITICAL FAILURE: Could not deliver email for booking {Id}", bookingId);
+                throw; // Rethrow for Hangfire retry mechanism
+            }
+        }
+
+        public async Task SendInvoiceEmailJob(int orderId)
+        {
+            _logger.LogInformation("BACKGROUND JOB: STARTING INVOICE EMAIL FOR ID {Id}", orderId);
+
+            var order = await _context.Orders
+                .Include(o => o.User)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Part)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order?.User == null || string.IsNullOrEmpty(order.User.Email))
+            {
+                _logger.LogWarning("BACKGROUND JOB FAILED: Order {Id} or user email not found.", orderId);
+                return;
+            }
+
+            var itemsSummary = string.Join(", ", order.OrderItems.Select(oi => $"{oi.Part?.Name} x{oi.Quantity}"));
+            var invoiceNumber = $"INV-{order.Id:D6}";
+
+            try
+            {
+                await _emailService.SendInvoiceEmailAsync(order.User.Email, invoiceNumber, order.TotalAmount, itemsSummary, order.PaymentStatus, order.AmountPaid);
+                _logger.LogInformation("BACKGROUND JOB SUCCESS: Email delivered for invoice {Id}", orderId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "BACKGROUND JOB CRITICAL FAILURE: Could not deliver email for invoice {Id}", orderId);
                 throw; // Rethrow for Hangfire retry mechanism
             }
         }

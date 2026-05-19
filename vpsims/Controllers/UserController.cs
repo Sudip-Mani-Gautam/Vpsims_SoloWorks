@@ -28,6 +28,8 @@ namespace vpsims.Controllers
                     u.Role,
                     u.IsActive,
                     u.CreatedAt,
+                    u.Phone,
+                    u.LoyaltyPoints,
                     Vehicles = u.Vehicles.Select(v => new { v.Make, v.Model, v.LicensePlate })
                 })
                 .ToListAsync();
@@ -128,20 +130,97 @@ namespace vpsims.Controllers
 
         [HttpGet("top-loyalty")]
         [Authorize(Roles = "Admin,Staff")]
-        public async Task<IActionResult> GetTopLoyalty()
+        public async Task<IActionResult> GetTopLoyalty([FromQuery] string period = "all")
         {
-            var topUsers = await _context.Users
-                .Where(u => u.Role == "Customer")
-                .OrderByDescending(u => u.LoyaltyPoints)
-                .Take(10)
-                .Select(u => new {
-                    u.Id,
-                    u.Name,
-                    u.Email,
-                    u.LoyaltyPoints
-                })
-                .ToListAsync();
-            return Ok(topUsers);
+            var now = DateTime.UtcNow;
+            DateTime? from = period switch {
+                "quarterly"  => now.AddMonths(-3),
+                "half-year"  => now.AddMonths(-6),
+                "yearly"     => now.AddMonths(-12),
+                _            => (DateTime?)null
+            };
+
+            if (from == null)
+            {
+                // All-time: use cumulative LoyaltyPoints
+                var topUsers = await _context.Users
+                    .Where(u => u.Role == "Customer")
+                    .OrderByDescending(u => u.LoyaltyPoints)
+                    .Take(10)
+                    .Select(u => new {
+                        id           = u.Id,
+                        name         = u.Name,
+                        email        = u.Email,
+                        loyaltyPoints= u.LoyaltyPoints
+                    })
+                    .ToListAsync();
+                return Ok(topUsers);
+            }
+            else
+            {
+                // Period-based: sum order amounts paid within the window as a proxy for earned points
+                var periodPoints = await _context.Users
+                    .Where(u => u.Role == "Customer")
+                    .Select(u => new {
+                        id    = u.Id,
+                        name  = u.Name,
+                        email = u.Email,
+                        loyaltyPoints = (int)u.Orders
+                            .Where(o => o.PaymentStatus == "Paid" && o.CreatedAt >= from)
+                            .Sum(o => (double)o.TotalAmount / 100) // 1 point per NPR 100
+                    })
+                    .OrderByDescending(u => u.loyaltyPoints)
+                    .Take(10)
+                    .ToListAsync();
+                return Ok(periodPoints);
+            }
         }
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateDto dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            user.Name = dto.Name ?? user.Name;
+            user.Email = dto.Email ?? user.Email;
+            user.Phone = dto.Phone ?? user.Phone;
+            user.Role = dto.Role ?? user.Role;
+            // Note: We don't update branch here if it's not in the model, 
+            // but the User model doesn't have a Branch property. 
+            // If branch is needed, it might be a custom field or another table.
+            // For now, let's just update the core fields.
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "User updated successfully" });
+        }
+
+        [HttpPatch("{id}/password")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ChangePassword(int id, [FromBody] PasswordUpdateDto dto)
+        {
+            if (string.IsNullOrEmpty(dto.Password) || dto.Password.Length < 6)
+                return BadRequest(new { message = "Password must be at least 6 characters" });
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password updated successfully" });
+        }
+    }
+
+    public class UserUpdateDto {
+        public string? Name { get; set; }
+        public string? Email { get; set; }
+        public string? Phone { get; set; }
+        public string? Role { get; set; }
+        public string? Branch { get; set; }
+    }
+
+    public class PasswordUpdateDto {
+        public string Password { get; set; } = string.Empty;
     }
 }

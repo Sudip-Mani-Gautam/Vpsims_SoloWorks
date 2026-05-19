@@ -251,5 +251,18 @@ namespace vpsims.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
+        public async Task<PartDto?> ImportStockAsync(int id, int quantity, string urgency, int? userId)
+        {
+            var part = await _context.Parts.Include(p => p.Category).Include(p => p.Supplier).FirstOrDefaultAsync(p => p.Id == id);
+            if (part == null) return null;
+
+            part.StockQuantity += quantity;
+            await _context.SaveChangesAsync();
+
+            await _activityLogService.LogAsync(userId, "STOCK_IMPORTED", $"Imported {quantity} units of '{part.Name}' (SKU: {part.SKU}) from vendor '{part.Supplier?.Name}' with {urgency} priority. New stock: {part.StockQuantity}.");
+
+            return ToDto(part);
+        }
     }
 }

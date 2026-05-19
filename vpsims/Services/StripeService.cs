@@ -17,8 +17,12 @@ namespace vpsims.Services
             StripeConfiguration.ApiKey = _configuration["StripeSettings:SecretKey"];
         }
 
-        public async Task<string> CreateCheckoutSessionAsync(int orderId, decimal amount, string customerEmail)
+        public async Task<Session> CreateCheckoutSessionAsync(int orderId, decimal amount, string customerEmail)
         {
+            // Convert NPR to USD for Stripe payment processing (Stripe does not support card payments in NPR for standard merchant regions)
+            decimal amountInUsd = amount / 133m;
+            if (amountInUsd < 0.50m) amountInUsd = 0.50m; // Stripe minimum charge is 0.50 USD
+
             var options = new SessionCreateOptions
             {
                 PaymentMethodTypes = new List<string> { "card" },
@@ -28,12 +32,12 @@ namespace vpsims.Services
                     {
                         PriceData = new SessionLineItemPriceDataOptions
                         {
-                            UnitAmount = (long)(amount * 100), // Stripe uses cents
-                            Currency = "npr", // Using NPR as per earlier context
+                            UnitAmount = (long)(amountInUsd * 100), // Stripe uses cents
+                            Currency = "usd",
                             ProductData = new SessionLineItemPriceDataProductDataOptions
                             {
                                 Name = $"Order #{orderId} - VPSIMS",
-                                Description = "Payment for spare parts / service",
+                                Description = $"Payment for spare parts / service (Converted from NPR {amount:N2})",
                             },
                         },
                         Quantity = 1,
@@ -53,7 +57,7 @@ namespace vpsims.Services
             var service = new SessionService();
             Session session = await service.CreateAsync(options);
 
-            return session.Id;
+            return session;
         }
 
         public async Task<bool> VerifyPaymentAsync(string sessionId)

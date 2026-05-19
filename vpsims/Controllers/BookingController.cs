@@ -81,5 +81,20 @@ namespace vpsims.Controllers
 
             return Ok(booking);
         }
+        [HttpGet("pending-count")]
+        public async Task<IActionResult> GetPendingCount()
+        {
+            var role = User.FindFirstValue(ClaimTypes.Role);
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var branchIdParam = Request.Query["branchId"];
+            int? bId = int.TryParse(branchIdParam, out var b) ? b : null;
+
+            var bookings = await _bookingService.GetAllAsync(role == "Customer" ? userId : null, bId);
+            
+            // "Pending" bookings
+            var count = bookings.Count(b => b.Status == "Pending");
+            return Ok(new { count });
+        }
     }
 }
