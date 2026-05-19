@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  Bell, Check, CheckCheck, ChevronRight, Loader2, Package, 
-  Calendar, Info, MessageSquare, CreditCard, Clock
+  Bell, CheckCheck, ChevronRight, Loader2, Package, 
+  Calendar, MessageSquare, CreditCard, Clock
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -22,9 +20,10 @@ interface Notification {
 }
 
 const NotificationsPage = () => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [filter, setFilter] = useState("all");
 
   const loadNotifications = async () => {
     try {
@@ -63,29 +62,39 @@ const NotificationsPage = () => {
   };
 
   const handleNotificationClick = async (n: Notification) => {
-    if (!n.isRead) await markRead(n.id);
-    if (!n.type || !n.relatedId) return;
+    // Mark as read first if not already
+    if (!n.isRead) {
+      await markRead(n.id);
+    }
 
+    // Direct redirection based on type
     switch (n.type) {
-      case "SUPPORT_REPLY":
-      case "SUPPORT_TICKET_NEW":
-      case "SUPPORT_MESSAGE_CUSTOMER":
-      case "SUPPORT_TICKET_ASSIGNED":
-        navigate(`/customer/support/${n.relatedId}`);
-        break;
       case "BOOKING_STATUS":
         navigate("/customer/appointments");
-        break;
-      case "ORDER_PAYMENT_UPDATE":
-        navigate("/customer/payments");
         break;
       case "PART_REQUEST_UPDATE":
         navigate("/customer/request-parts");
         break;
+      case "ORDER_PAYMENT_UPDATE":
+        navigate("/customer/payments");
+        break;
+      case "SUPPORT_REPLY":
+        if (n.relatedId) {
+          navigate(`/customer/support/${n.relatedId}`);
+        } else {
+          navigate("/customer/support");
+        }
+        break;
       default:
+        // No specific redirection for generic notifications
         break;
     }
   };
+
+  const filtered = notifications.filter(n => {
+    if (filter === "unread") return !n.isRead;
+    return true;
+  });
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -101,107 +110,171 @@ const NotificationsPage = () => {
     return date.toLocaleDateString();
   };
 
-  const getIcon = (type?: string) => {
+  const getTypeStyles = (type?: string) => {
     switch (type) {
-      case "BOOKING_STATUS": return <Calendar className="w-4 h-4 text-emerald-600" />;
-      case "SUPPORT_REPLY": return <MessageSquare className="w-4 h-4 text-blue-600" />;
-      case "ORDER_PAYMENT_UPDATE": return <CreditCard className="w-4 h-4 text-purple-600" />;
-      case "PART_REQUEST_UPDATE": return <Package className="w-4 h-4 text-amber-600" />;
-      default: return <Bell className="w-4 h-4 text-primary" />;
+      case "BOOKING_STATUS": return { icon: <Calendar className="w-4 h-4" />, color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
+      case "SUPPORT_REPLY": return { icon: <MessageSquare className="w-4 h-4" />, color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" };
+      case "ORDER_PAYMENT_UPDATE": return { icon: <CreditCard className="w-4 h-4" />, color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" };
+      case "PART_REQUEST_UPDATE": return { icon: <Package className="w-4 h-4" />, color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" };
+      default: return { icon: <Bell className="w-4 h-4" />, color: "text-primary", bg: "bg-primary/10", border: "border-primary/20" };
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6 bg-background min-h-screen">
-      {/* Balanced Professional Header */}
-      <div className="flex items-center justify-between border-b border-border pb-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg border border-primary/20">
-             <Bell className="w-6 h-6" />
+    <div className="min-h-[calc(100vh-64px)] bg-muted/10">
+      {/* Page Header Bar */}
+      <div className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Bell className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-[15px] font-black tracking-tight text-foreground">Notification Center</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Real-time Activity Feed</p>
+            </div>
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                {unreadCount} NEW
+              </span>
+            )}
           </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground uppercase">Notification Center</h1>
-            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mt-1">Real-time Activity Stream</p>
+
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button 
+                onClick={markAllRead} 
+                className="text-[10px] font-black text-primary border border-primary/20 bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider"
+              >
+                Mark All Read
+              </button>
+            )}
+            <div className="flex items-center bg-muted border border-border rounded-lg p-0.5">
+              <button 
+                onClick={() => setFilter("all")}
+                className={cn("px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all", 
+                  filter === "all" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+              >
+                All
+              </button>
+              <button 
+                onClick={() => setFilter("unread")}
+                className={cn("px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all flex items-center gap-1.5", 
+                  filter === "unread" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+              >
+                Unread
+                {unreadCount > 0 && <span className="bg-red-500 text-white text-[8px] font-black px-1.5 rounded-full">{unreadCount}</span>}
+              </button>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Badge className="bg-red-500 text-white border-none px-3 py-1 text-[10px] font-black">{unreadCount} PENDING</Badge>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs font-black uppercase tracking-widest text-primary hover:bg-primary/5">
-              Mark All Read
-            </Button>
-          )}
+
+        {/* Stats Strip */}
+        <div className="max-w-5xl mx-auto px-6 pb-3 flex items-center gap-6">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-primary inline-block"></span>
+            {notifications.length} Total
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span>
+            {unreadCount} Unread
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+            <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+            {notifications.length - unreadCount} Read
+          </div>
         </div>
       </div>
 
-      {/* Solid Professional Feed */}
-      <div className="space-y-3">
+      {/* Content */}
+      <div className="max-w-5xl mx-auto px-6 py-6">
         {loading ? (
-          <div className="py-20 text-center flex flex-col items-center gap-4">
-             <Loader2 className="w-8 h-8 animate-spin text-primary" />
-             <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Updating stream...</p>
+          <div className="py-32 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-primary/40" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">Synchronizing feed...</p>
           </div>
-        ) : notifications.length === 0 ? (
-          <div className="py-24 text-center border-2 border-dashed border-border rounded-2xl bg-card flex flex-col items-center gap-4 shadow-inner">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-               <Package className="w-8 h-8 text-muted-foreground/40" />
+        ) : filtered.length === 0 ? (
+          <div className="py-32 flex flex-col items-center gap-4 bg-card/50 rounded-2xl border border-border/50 border-dashed mt-4">
+            <div className="w-14 h-14 rounded-full bg-muted/50 border border-border flex items-center justify-center">
+              <CheckCheck className="w-6 h-6 text-muted-foreground/30" />
             </div>
-            <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">All logs cleared</p>
+            <div className="text-center space-y-1">
+              <p className="text-[13px] font-black text-foreground">All caught up</p>
+              <p className="text-[11px] text-muted-foreground">No {filter === "unread" ? "unread " : ""}notifications to show</p>
+            </div>
+            {filter === "unread" && (
+              <button onClick={() => setFilter("all")} className="text-[10px] font-black text-primary hover:underline uppercase tracking-wider">
+                View all history
+              </button>
+            )}
           </div>
         ) : (
-          <div className="space-y-2">
-            {notifications.map((n) => (
-              <Card 
-                key={n.id} 
-                onClick={() => handleNotificationClick(n)}
-                className={cn(
-                  "border border-border rounded-xl overflow-hidden cursor-pointer transition-all hover:translate-x-1 active:scale-[0.98] shadow-sm hover:shadow-md",
-                  !n.isRead ? "bg-card border-l-4 border-l-primary" : "bg-muted/30 opacity-80"
-                )}
-              >
-                <CardContent className="p-4 flex items-center gap-5">
-                  {/* Icon Box */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            {filtered.map((n, index) => {
+              const styles = getTypeStyles(n.type);
+              return (
+                <div 
+                  key={n.id} 
+                  onClick={() => handleNotificationClick(n)}
+                  className={cn(
+                    "group relative flex items-start gap-4 px-5 py-4 cursor-pointer transition-all duration-200",
+                    "hover:bg-muted/40",
+                    index !== 0 && "border-t border-border/60",
+                    !n.isRead && "bg-primary/[0.02]"
+                  )}
+                >
+                  {/* Unread Indicator */}
+                  {!n.isRead && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />}
+
+                  {/* Icon */}
                   <div className={cn(
-                    "w-10 h-10 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all",
-                    !n.isRead ? "bg-primary/5 border-primary/10" : "bg-muted border-border/50"
+                    "mt-0.5 w-9 h-9 rounded-xl border flex items-center justify-center shrink-0",
+                    styles.bg, styles.color, styles.border
                   )}>
-                    {getIcon(n.type)}
+                    {styles.icon}
                   </div>
 
-                  {/* Content Box */}
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-4 mb-1">
-                       <span className={cn("text-[10px] font-black uppercase tracking-widest", !n.isRead ? "text-primary" : "text-muted-foreground")}>
-                          {n.title}
-                       </span>
-                       <span className="text-[10px] font-bold text-muted-foreground/60 uppercase whitespace-nowrap flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" /> {getRelativeTime(n.createdAt)}
-                       </span>
-                    </div>
-                    <p className={cn("text-sm leading-snug", !n.isRead ? "font-bold text-foreground" : "font-medium text-muted-foreground")}>
-                      {n.message}
-                    </p>
-                  </div>
+                    <div className="flex items-start justify-between gap-6">
+                      <div className="space-y-0.5 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-[9px] font-black uppercase tracking-[0.15em]", styles.color)}>
+                            {n.title}
+                          </span>
+                          {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />}
+                        </div>
+                        <p className={cn(
+                          "text-[13px] leading-snug",
+                          !n.isRead ? "font-semibold text-foreground" : "font-normal text-muted-foreground/80"
+                        )}>
+                          {n.message}
+                        </p>
+                      </div>
 
-                  {/* Status Box */}
-                  <div className="flex-shrink-0">
-                    {!n.isRead ? (
-                      <div className="w-3 h-3 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
-                    )}
+                      <div className="shrink-0 flex flex-col items-end gap-1.5">
+                        <span className="text-[10px] text-muted-foreground/60 font-medium whitespace-nowrap flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {getRelativeTime(n.createdAt)}
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
-      </div>
 
-      <div className="pt-8 text-center">
-        <Button variant="outline" size="sm" className="border-border hover:bg-muted text-[10px] font-black uppercase tracking-[0.2em] px-8 h-10 rounded-xl transition-all" asChild>
-          <Link to="/customer">Return to Command Hub</Link>
-        </Button>
+        {/* Footer */}
+        <div className="mt-10 pt-6 border-t border-border/50 flex items-center justify-between">
+          <p className="text-[10px] text-muted-foreground/40 font-bold uppercase tracking-widest">© 2026 VPSIMS Enterprise</p>
+          <Button variant="outline" size="sm" className="h-9 px-5 rounded-xl text-[10px] font-black uppercase tracking-wider border-border hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all" asChild>
+            <Link to="/customer" className="flex items-center gap-2">
+              Return to Dashboard <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

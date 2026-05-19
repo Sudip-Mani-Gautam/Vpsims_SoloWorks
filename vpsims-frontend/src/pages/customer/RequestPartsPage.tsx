@@ -5,20 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, 
-  DialogDescription 
-} from "@/components/ui/dialog";
-import { 
-  Package, CheckCircle, Clock, Send, Loader2, X, XCircle, 
-  AlertTriangle, Search, Filter, Tag, Cpu, Car, AlertCircle, Ban,
-  History as HistoryIcon, ChevronRight
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import {
+  Package, CheckCircle, Send, Loader2, Search, Car,
+  History as HistoryIcon, X, AlertTriangle, Ban,
+  ArrowUpRight, Clock, Zap, ShieldAlert, ChevronDown, Plus, UploadCloud
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import debounce from "lodash/debounce";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 
 interface Part {
   id: number;
@@ -27,9 +31,12 @@ interface Part {
   categoryName: string;
 }
 
-interface Category {
+interface Vehicle {
   id: number;
-  name: string;
+  make: string;
+  model: string;
+  licensePlate: string;
+  year: number;
 }
 
 interface PartRequest {
@@ -44,6 +51,20 @@ interface PartRequest {
   createdAt: string;
 }
 
+const statusMeta: Record<string, { label: string; bg: string; text: string; border: string; dot: string }> = {
+  Pending: { label: "Pending", bg: "bg-amber-500/10", text: "text-amber-600", border: "border-amber-500/20", dot: "bg-amber-500" },
+  Available: { label: "Available", bg: "bg-emerald-500/10", text: "text-emerald-600", border: "border-emerald-500/20", dot: "bg-emerald-500" },
+  Procuring: { label: "Procuring", bg: "bg-blue-500/10", text: "text-blue-600", border: "border-blue-500/20", dot: "bg-blue-500" },
+  Rejected: { label: "Rejected", bg: "bg-red-500/10", text: "text-red-600", border: "border-red-500/20", dot: "bg-red-500" },
+  Cancelled: { label: "Cancelled", bg: "bg-slate-400/10", text: "text-slate-500", border: "border-slate-400/20", dot: "bg-slate-400" },
+};
+
+const priorityMeta = {
+  Normal: { icon: <Clock size={12} />, color: "text-slate-500", bg: "bg-slate-100 dark:bg-slate-800" },
+  Urgent: { icon: <AlertTriangle size={12} />, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/40" },
+  Critical: { icon: <ShieldAlert size={12} />, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/40" },
+};
+
 const RequestPartsPage = () => {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,46 +72,46 @@ const RequestPartsPage = () => {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [requestToCancel, setRequestToCancel] = useState<number | null>(null);
-  
-  const [form, setForm] = useState({ 
-    partName: '', 
-    partNumber: '', 
-    vehicleModel: '', 
-    quantity: 1, 
-    priority: 'Normal', 
-    description: '',
-    categoryId: ''
+
+  const [form, setForm] = useState({
+    partName: '', partNumber: '', vehicleModel: '',
+    quantity: 1, priority: 'Normal', description: '', categoryId: '', image: ''
   });
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        setForm(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const [suggestions, setSuggestions] = useState<Part[]>([]);
   const [searching, setSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [myVehicles, setMyVehicles] = useState<Vehicle[]>([]);
 
   const fetchData = async () => {
     try {
-      const [hRes, cRes] = await Promise.all([
-        api.get('/partrequest/my'),
-        api.get('/category')
-      ]);
+      const hRes = await api.get('/partrequest/my');
       setHistory(hRes.data);
-      setCategories(cRes.data);
-    } catch {
-      toast.error("Sync failed.");
-    } finally {
-      setLoadingHistory(false);
-    }
+      const vRes = await api.get('/vehicle');
+      setMyVehicles(vRes.data);
+    } catch { toast.error("Failed to load request data."); }
+    finally { setLoadingHistory(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
 
   const searchParts = useCallback(
     debounce(async (query: string) => {
-      if (query.length < 2) {
-        setSuggestions([]);
-        setSearching(false);
-        return;
-      }
+      if (query.length < 2) { setSuggestions([]); setSearching(false); return; }
       setSearching(true);
       try {
         const res = await api.get(`/part/search?q=${query}`);
@@ -98,8 +119,7 @@ const RequestPartsPage = () => {
         setShowSuggestions(true);
       } catch { }
       finally { setSearching(false); }
-    }, 300),
-    []
+    }, 300), []
   );
 
   const handlePartNameChange = (val: string) => {
@@ -115,7 +135,7 @@ const RequestPartsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.partName || !form.vehicleModel) {
-      toast.error("Input missing.");
+      toast.error("Please fill in Part Name and Vehicle Model.");
       return;
     }
     setLoading(true);
@@ -123,211 +143,375 @@ const RequestPartsPage = () => {
       await api.post('/partrequest', form);
       setSubmitted(true);
       fetchData();
-      toast.success("Request sent.");
-    } catch {
-      toast.error("Submission failed.");
-    } finally {
-      setLoading(false);
-    }
+      toast.success("Part request submitted successfully!");
+    } catch { toast.error("Submission failed. Please try again."); }
+    finally { setLoading(false); }
   };
 
   const handleCancelRequest = async () => {
     if (!requestToCancel) return;
     try {
       await api.patch(`/partrequest/${requestToCancel}/cancel`);
-      toast.success("Cancelled.");
+      toast.success("Request cancelled.");
       setCancelDialogOpen(false);
       fetchData();
-    } catch {
-      toast.error("Cancellation failed.");
-    } finally {
-      setRequestToCancel(null);
-    }
+    } catch { toast.error("Cancellation failed."); }
+    finally { setRequestToCancel(null); }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Available': return 'bg-emerald-500 text-white';
-      case 'Procuring': return 'bg-blue-500 text-white';
-      case 'Rejected': return 'bg-red-500 text-white';
-      case 'Cancelled': return 'bg-slate-500 text-white';
-      default: return 'bg-amber-500 text-white';
-    }
-  };
+  const pendingCount = history.filter(r => r.status === 'Pending').length;
+  const availableCount = history.filter(r => r.status === 'Available').length;
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 space-y-8 bg-background min-h-screen" onClick={() => setShowSuggestions(false)}>
-      {/* Balanced Professional Header */}
-      <div className="flex items-center justify-between border-b border-border pb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg border border-primary/20">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-foreground uppercase">Part Procurement</h1>
-            <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest mt-1">Sourcing & Acquisition Node</p>
-          </div>
+    <div className="max-w-6xl mx-auto space-y-6 pb-10" onClick={() => setShowSuggestions(false)}>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Request Parts</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Search and request vehicle parts from our inventory</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {pendingCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 text-xs font-semibold">
+              <Clock size={13} /> {pendingCount} pending
+            </div>
+          )}
+          {availableCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-semibold">
+              <CheckCircle size={13} /> {availableCount} ready
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Balanced Form Column */}
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="border-2 border-border rounded-2xl bg-card overflow-hidden shadow-xl">
-            <CardHeader className="bg-muted p-5 border-b border-border">
-               <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3">
-                  <Send className="w-4 h-4 text-primary" /> Initialize Sourcing
-               </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              {submitted ? (
-                <div className="text-center py-10 space-y-6">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500 shadow-lg shadow-emerald-500/10">
-                    <CheckCircle className="w-8 h-8 text-emerald-600" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-black text-sm uppercase">Request Authenticated</h3>
-                    <p className="text-xs font-medium text-muted-foreground">Our team is initiating the search.</p>
-                  </div>
-                  <Button className="w-full text-xs font-black uppercase tracking-widest h-11 rounded-xl" variant="outline" onClick={() => { setSubmitted(false); setForm({ partName: '', partNumber: '', vehicleModel: '', quantity: 1, priority: 'Normal', description: '', categoryId: '' }); }}>
-                    Submit New Request
-                  </Button>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* ── Request Form ── */}
+        <div className="lg:col-span-4">
+          <Card className="border-border sticky top-6">
+            <CardHeader className="border-b border-border py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                  <Package size={16} />
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="space-y-2 relative">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Part Designation *</Label>
-                    <div className="relative">
-                      <Input value={form.partName} onChange={e => handlePartNameChange(e.target.value)} placeholder="Search parts inventory..." className="bg-muted/30 border-2 border-border text-sm h-11 pl-10 font-bold rounded-xl focus:border-primary transition-all" onFocus={() => form.partName.length > 1 && setShowSuggestions(true)} />
-                      <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-muted-foreground" />
+                <div>
+                  <CardTitle className="text-sm font-bold">New Request</CardTitle>
+                  <p className="text-[10px] text-muted-foreground font-medium">Submit a part procurement request</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-5">
+              <AnimatePresence mode="wait">
+                {submitted ? (
+                  <motion.div
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center text-center py-8 gap-4"
+                  >
+                    <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      <CheckCircle size={28} className="text-emerald-600" />
                     </div>
-                    {showSuggestions && suggestions.length > 0 && (
-                      <div className="absolute z-50 w-full mt-2 bg-card border-2 border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-                        {suggestions.map(s => (
-                          <button key={s.id} type="button" className="w-full px-4 py-3 flex flex-col items-start gap-1 hover:bg-primary/5 text-left border-b border-border last:border-0 transition-colors" onClick={(e) => { e.stopPropagation(); selectSuggestion(s); }}>
-                            <span className="text-xs font-black uppercase">{s.name}</span>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{s.categoryName} • {s.partNumber}</span>
-                          </button>
-                        ))}
+                    <div>
+                      <h3 className="text-sm font-bold text-foreground">Request Submitted!</h3>
+                      <p className="text-xs text-muted-foreground mt-1">Our team will start sourcing immediately.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-semibold mt-2"
+                      onClick={() => { setSubmitted(false); setForm({ partName: '', partNumber: '', vehicleModel: '', quantity: 1, priority: 'Normal', description: '', categoryId: '', image: '' }); setImagePreview(null); fetchData(); }}
+                    >
+                      Submit Another Request
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.form
+                    key="form"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onSubmit={handleSubmit}
+                    className="space-y-4"
+                  >
+                    {/* Part Search */}
+                    <div className="space-y-1.5 relative">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-muted-foreground">Part Name *</Label>
+                        <span className="text-[10px] text-primary font-bold uppercase tracking-tighter italic">Select or Type</span>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantity</Label>
-                      <Input type="number" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: parseInt(e.target.value) || 1 })} className="bg-muted/30 border-2 border-border text-sm h-11 font-bold rounded-xl" />
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        {searching && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground animate-spin" />}
+                        <Input
+                          value={form.partName}
+                          onChange={e => handlePartNameChange(e.target.value)}
+                          placeholder="Search or type part name..."
+                          className="pl-9 h-10 text-sm border-border"
+                          onFocus={() => form.partName.length > 1 && setShowSuggestions(true)}
+                        />
+                      </div>
+                      {/* Autocomplete */}
+                      <AnimatePresence>
+                        {showSuggestions && suggestions.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
+                          >
+                            {suggestions.map(s => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                className="w-full px-4 py-3 flex items-start gap-3 hover:bg-muted text-left border-b border-border last:border-0 transition-colors"
+                                onClick={e => { e.stopPropagation(); selectSuggestion(s); }}
+                              >
+                                <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center text-primary flex-shrink-0 mt-0.5">
+                                  <Package size={12} />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-semibold text-foreground">{s.name}</p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">{s.categoryName} · {s.partNumber}</p>
+                                </div>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Priority</Label>
-                      <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="flex h-11 w-full rounded-xl border-2 border-border bg-muted/30 px-3 text-sm font-bold focus:outline-none appearance-none transition-all focus:border-primary cursor-pointer">
-                        <option value="Normal">NORMAL</option>
-                        <option value="Urgent">URGENT</option>
-                        <option value="Critical">CRITICAL</option>
-                      </select>
+
+                    {/* Quantity + Priority */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground">Quantity</Label>
+                        <Input type="number" min="1" value={form.quantity}
+                          onChange={e => setForm({ ...form, quantity: parseInt(e.target.value) || 1 })}
+                          className="h-10 text-sm border-border"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-semibold text-muted-foreground">Priority</Label>
+                        <select
+                          value={form.priority}
+                          onChange={e => setForm({ ...form, priority: e.target.value })}
+                          className={cn(
+                            "flex h-10 w-full rounded-md border border-border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer bg-background",
+                            form.priority === 'Critical' ? "text-red-600 font-semibold" :
+                              form.priority === 'Urgent' ? "text-amber-600 font-semibold" : ""
+                          )}
+                        >
+                          <option value="Normal">Normal</option>
+                          <option value="Urgent">Urgent</option>
+                          <option value="Critical">Critical</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Vehicle Asset Model *</Label>
-                    <Input value={form.vehicleModel} onChange={e => setForm({ ...form, vehicleModel: e.target.value })} placeholder="e.g. 2018 Toyota Camry" className="bg-muted/30 border-2 border-border text-sm h-11 font-bold rounded-xl" />
-                  </div>
+                    {/* Vehicle Model - DUAL INPUT */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-muted-foreground">Vehicle Model *</Label>
+                        {myVehicles.length > 0 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-1 hover:opacity-70">
+                                <Car size={10} /> My Vehicles <ChevronDown size={10} />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 rounded-xl border-border shadow-xl">
+                              <p className="px-3 py-2 text-[10px] font-black uppercase text-muted-foreground tracking-widest">Select Registered Car</p>
+                              <DropdownMenuSeparator />
+                              {myVehicles.map(v => (
+                                <DropdownMenuItem
+                                  key={v.id}
+                                  className="p-2 cursor-pointer rounded-lg"
+                                  onClick={() => setForm(f => ({ ...f, vehicleModel: `${v.year} ${v.make} ${v.model} (${v.licensePlate})` }))}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                      <Car size={14} />
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-foreground">{v.make} {v.model}</p>
+                                      <p className="text-[10px] text-muted-foreground">{v.licensePlate}</p>
+                                    </div>
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="p-2 cursor-pointer rounded-lg text-primary text-[10px] font-black uppercase justify-center" onClick={() => setForm(f => ({ ...f, vehicleModel: "" }))}>
+                                <Plus size={10} className="mr-1" /> Custom Entry
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <Car size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={form.vehicleModel}
+                          onChange={e => setForm({ ...form, vehicleModel: e.target.value })}
+                          placeholder=" e.g. '2023 Toyota Hilux' or Search"
+                          className="pl-9 h-10 text-sm border-border"
+                        />
+                      </div>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Operational Details</Label>
-                    <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Specific part requirements..." className="bg-muted/30 border-2 border-border text-sm min-h-[100px] p-4 resize-none font-medium rounded-xl focus:border-primary transition-all" />
-                  </div>
+                    {/* Image Upload */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">Reference Image <span className="font-normal opacity-60">(optional)</span></Label>
+                      {imagePreview ? (
+                        <div className="relative rounded-xl overflow-hidden border border-border bg-muted/30 h-32 flex items-center justify-center group">
+                          <img src={imagePreview} alt="Preview" className="h-full w-full object-contain" />
+                          <button 
+                            type="button" 
+                            onClick={() => { setImagePreview(null); setForm(f => ({ ...f, image: '' })); }}
+                            className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-border rounded-xl hover:bg-muted/30 hover:border-primary/50 transition-colors cursor-pointer bg-background">
+                          <div className="flex flex-col items-center justify-center pt-4 pb-4">
+                            <UploadCloud className="w-6 h-6 text-muted-foreground/50 mb-2" />
+                            <p className="text-xs text-muted-foreground font-medium"><span className="text-primary font-bold">Click to upload</span> an image</p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-0.5">PNG, JPG, GIF up to 5MB</p>
+                          </div>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                        </label>
+                      )}
+                    </div>
 
-                  <Button type="submit" disabled={loading} className="w-full bg-primary text-white font-black text-xs uppercase tracking-[0.2em] h-12 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all mt-2">
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Authorize Transmission"}
-                  </Button>
-                </form>
-              )}
+                    {/* Description */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-semibold text-muted-foreground">Description <span className="font-normal opacity-60">(optional)</span></Label>
+                      <Textarea
+                        value={form.description}
+                        onChange={e => setForm({ ...form, description: e.target.value })}
+                        placeholder="Specific requirements or part condition notes..."
+                        className="resize-none text-sm border-border min-h-[80px]"
+                      />
+                    </div>
+
+                    <Button type="submit" disabled={loading} className="w-full h-10 font-semibold shadow-md shadow-primary/10">
+                      {loading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Send size={14} className="mr-2" />}
+                      {loading ? "Submitting..." : "Submit Request"}
+                    </Button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
             </CardContent>
           </Card>
         </div>
 
-        {/* Balanced History Table */}
+        {/* ── Request History ── */}
         <div className="lg:col-span-8">
-          <Card className="border-2 border-border rounded-2xl bg-card overflow-hidden shadow-xl h-full flex flex-col">
-            <CardHeader className="bg-muted p-5 border-b border-border flex flex-row items-center justify-between space-y-0">
-               <CardTitle className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-3">
-                  <HistoryIcon className="w-4 h-4 text-primary" /> Acquisition Log
-               </CardTitle>
-               <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-black px-2 py-0.5 rounded-sm">{history.length} RECORDS</Badge>
+          <Card className="border-border">
+            <CardHeader className="border-b border-border py-4 px-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <HistoryIcon size={18} className="text-primary" />
+                  <div>
+                    <CardTitle className="text-sm font-bold">Request History</CardTitle>
+                    <p className="text-[10px] text-muted-foreground font-medium">{history.length} total requests</p>
+                  </div>
+                </div>
+              </div>
             </CardHeader>
-            <div className="flex-1 overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/50 border-b-2 border-border">
-                  <TableRow>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 px-6 text-foreground">Asset & Part</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 text-center text-foreground">Status</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest h-12 px-6 text-right text-foreground">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loadingHistory ? (
-                    <TableRow><TableCell colSpan={3} className="h-64 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary opacity-20" /></TableCell></TableRow>
-                  ) : history.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="h-64 text-center text-sm font-medium text-muted-foreground">No records found</TableCell></TableRow>
-                  ) : history.map((req) => (
-                    <TableRow key={req.id} className={cn("border-b border-border transition-all h-14", req.status === 'Cancelled' ? "bg-muted/20 opacity-60" : "hover:bg-muted/40")}>
-                      <TableCell className="px-6 py-3">
-                        <div className="flex flex-col gap-0.5">
-                          <span className={cn("font-black text-sm uppercase tracking-tight", req.status === 'Cancelled' && "line-through text-muted-foreground")}>
-                             {req.partName} <span className="text-primary font-black ml-1 text-xs">x{req.quantity}</span>
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{req.vehicleModel}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center py-3">
-                        <Badge className={cn("text-[9px] font-black uppercase px-2 py-0.5 border-none shadow-sm", getStatusColor(req.status))}>
-                          {req.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-6 text-right py-3">
-                        {req.status === 'Pending' ? (
-                          <Button variant="ghost" size="sm" onClick={() => { setRequestToCancel(req.id); setCancelDialogOpen(true); }} className="text-[10px] font-black uppercase text-red-500 hover:bg-red-50 hover:text-red-600 h-8 px-4 rounded-lg">
-                             Abort
-                          </Button>
-                        ) : (
-                           <div className="flex items-center justify-end gap-1.5 text-muted-foreground/30">
-                              <span className="text-[9px] font-black uppercase italic">Closed</span>
-                              <ChevronRight className="w-3.5 h-3.5" />
-                           </div>
+            <CardContent className="p-0">
+              {loadingHistory ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 size={24} className="animate-spin text-muted-foreground/40" />
+                  <p className="text-xs text-muted-foreground">Loading your requests...</p>
+                </div>
+              ) : history.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center px-8">
+                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3 opacity-50">
+                    <Package size={22} className="text-muted-foreground" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">No requests yet</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Use the form to submit your first part request</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {history.map((req) => {
+                    const sm = statusMeta[req.status] ?? statusMeta['Pending'];
+                    const pm = priorityMeta[req.priority as keyof typeof priorityMeta] ?? priorityMeta['Normal'];
+                    return (
+                      <div
+                        key={req.id}
+                        className={cn(
+                          "flex items-center justify-between gap-4 px-6 py-4 transition-colors",
+                          req.status === 'Cancelled' ? "opacity-50" : "hover:bg-muted/30"
                         )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      >
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0", sm.bg, sm.text)}>
+                            <Package size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={cn("text-sm font-semibold text-foreground truncate", req.status === 'Cancelled' && "line-through text-muted-foreground")}>
+                                {req.partName}
+                              </span>
+                              <span className="text-xs text-muted-foreground">×{req.quantity}</span>
+                              <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold", pm.color, pm.bg)}>
+                                {pm.icon} {req.priority}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground font-medium mt-0.5">{req.vehicleModel}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold border", sm.bg, sm.text, sm.border)}>
+                            <span className={cn("w-1.5 h-1.5 rounded-full", sm.dot)} />
+                            {sm.label}
+                          </span>
+                          {req.status === 'Pending' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setRequestToCancel(req.id); setCancelDialogOpen(true); }}
+                              className="h-8 px-3 text-xs text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 font-semibold rounded-lg"
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>
 
+      {/* Cancel Confirm Dialog */}
       <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent className="max-w-md bg-card border-2 border-border shadow-2xl p-8 rounded-2xl">
-           <div className="space-y-6">
-              <div className="flex items-center gap-4 text-red-600">
-                 <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
-                    <Ban className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <h2 className="text-lg font-black uppercase tracking-tight">Abort Procurement</h2>
-                    <p className="text-xs font-bold text-muted-foreground">Permanent cancellation request</p>
-                 </div>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground leading-relaxed">
-                 Are you sure you want to cancel this acquisition log? Our procurement team will immediately halt the global parts search.
+        <DialogContent className="max-w-sm rounded-2xl border-border">
+          <div className="flex items-start gap-4 pt-2">
+            <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 flex items-center justify-center text-red-500 flex-shrink-0">
+              <Ban size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Cancel this request?</h3>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Cancelling will stop the procurement process for this part. This action cannot be undone.
               </p>
-              <div className="flex gap-3 pt-2">
-                 <Button variant="outline" onClick={() => setCancelDialogOpen(false)} className="flex-1 text-xs font-black uppercase h-11 rounded-xl">Discard</Button>
-                 <Button onClick={handleCancelRequest} className="flex-1 bg-red-600 text-white text-xs font-black uppercase h-11 rounded-xl shadow-lg shadow-red-500/20 hover:bg-red-700 transition-all">
-                    Confirm Abort
-                 </Button>
-              </div>
-           </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 mt-2">
+            <Button variant="outline" size="sm" className="flex-1 font-semibold" onClick={() => setCancelDialogOpen(false)}>
+              Keep Request
+            </Button>
+            <Button size="sm" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold" onClick={handleCancelRequest}>
+              Yes, Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -335,3 +519,4 @@ const RequestPartsPage = () => {
 };
 
 export default RequestPartsPage;
+

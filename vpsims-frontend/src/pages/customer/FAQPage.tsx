@@ -2,11 +2,18 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { HelpCircle, Loader2, MessageCircle, ChevronDown, Search, ArrowRight } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import {
+  HelpCircle, Loader2, MessageCircle, Search, ArrowRight,
+  BookOpen, ChevronDown, Tag
+} from "lucide-react";
+import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger
+} from "@/components/ui/accordion";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface FAQ {
   id: number;
@@ -16,25 +23,15 @@ interface FAQ {
   hexColor?: string;
 }
 
-const COLOR_MAP: Record<string, string> = {
-  "white": "hsl(var(--card))",
-  "blue": "hsl(217 91% 60% / 0.1)",
-  "green": "hsl(142 71% 45% / 0.1)",
-  "yellow": "hsl(38 92% 50% / 0.1)",
-  "red": "hsl(0 72% 51% / 0.1)",
-  "purple": "hsl(262 83% 58% / 0.1)",
-  "gray": "hsl(var(--muted))"
+const CATEGORY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  Rewards:  { bg: "bg-amber-500/10",   text: "text-amber-600",   dot: "bg-amber-500"   },
+  Bookings: { bg: "bg-blue-500/10",    text: "text-blue-600",    dot: "bg-blue-500"    },
+  Parts:    { bg: "bg-violet-500/10",  text: "text-violet-600",  dot: "bg-violet-500"  },
+  Policies: { bg: "bg-rose-500/10",    text: "text-rose-600",    dot: "bg-rose-500"    },
+  Default:  { bg: "bg-primary/10",     text: "text-primary",     dot: "bg-primary"     },
 };
 
-const ACCENT_MAP: Record<string, string> = {
-  "white": "hsl(var(--border))",
-  "blue": "hsl(217 91% 60%)",
-  "green": "hsl(142 71% 45%)",
-  "yellow": "hsl(38 92% 50%)",
-  "red": "hsl(0 72% 51%)",
-  "purple": "hsl(262 83% 58%)",
-  "gray": "hsl(215 16% 47%)"
-};
+const getCatStyle = (cat: string) => CATEGORY_COLORS[cat] || CATEGORY_COLORS.Default;
 
 const FAQPage = () => {
   const navigate = useNavigate();
@@ -52,136 +49,184 @@ const FAQPage = () => {
   const categories = ["All", ...Array.from(new Set(faqs.map(f => f.category)))];
 
   const filteredFaqs = faqs.filter(f => {
-    const matchesSearch = f.question.toLowerCase().includes(search.toLowerCase()) || 
-                         f.answer.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      f.question.toLowerCase().includes(search.toLowerCase()) ||
+      f.answer.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = activeCategory === "All" || f.category === activeCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const getRowBg = (colorName?: string) => {
-    if (!colorName) return COLOR_MAP["white"];
-    const key = colorName.toLowerCase();
-    return COLOR_MAP[key] || COLOR_MAP["white"];
-  };
-
-  const getAccentColor = (colorName?: string) => {
-    if (!colorName) return ACCENT_MAP["blue"];
-    const key = colorName.toLowerCase();
-    return ACCENT_MAP[key] || ACCENT_MAP["blue"];
-  };
+  const countByCategory = (cat: string) =>
+    cat === "All" ? faqs.length : faqs.filter(f => f.category === cat).length;
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-6 space-y-8 min-h-screen bg-background text-foreground">
-      {/* Compact Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border pb-8">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-primary/10 text-primary shadow-sm border border-primary/20">
-            <HelpCircle className="w-6 h-6" />
-          </div>
-          <div className="space-y-0.5">
-            <h1 className="text-2xl font-black text-foreground tracking-tight">Knowledge Base</h1>
-            <p className="text-muted-foreground text-sm font-medium">Find instant answers to your questions.</p>
-          </div>
-        </div>
+    <div className="max-w-6xl mx-auto space-y-6 pb-10">
 
-        {/* Compact Search Bar */}
-        <div className="relative w-full max-w-md group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-          <Input 
-            placeholder="Search help articles..." 
-            className="h-11 pl-11 pr-4 rounded-xl border-input bg-card shadow-sm text-sm font-medium focus:ring-4 focus:ring-primary/10 transition-all"
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Knowledge Base</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Find instant answers to your questions</p>
+        </div>
+        {/* Search */}
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search help articles..."
+            className="h-10 pl-9 text-sm border-border bg-background"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              {filteredFaqs.length}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-10 pt-4">
-        {/* Sidebar Navigation */}
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-3 mb-3">Filter by Topic</h3>
-            <div className="flex flex-col gap-1">
-              {categories.map(cat => (
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+
+        {/* ── Sidebar ── */}
+        <div className="space-y-5">
+          {/* Category Filter */}
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1 mb-2">Filter by Topic</p>
+            {categories.map(cat => {
+              const style = getCatStyle(cat);
+              const isActive = activeCategory === cat;
+              return (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={cn(
-                    "flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold transition-all",
-                    activeCategory === cat 
-                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
+                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold transition-all",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
-                  {cat}
-                  <ArrowRight className={cn("w-3 h-3 transition-transform", activeCategory === cat ? "translate-x-0" : "-translate-x-2 opacity-0")} />
+                  <span className="flex items-center gap-2">
+                    {cat !== "All" && (
+                      <span className={cn("w-2 h-2 rounded-full", isActive ? "bg-white/60" : style.dot)} />
+                    )}
+                    {cat}
+                  </span>
+                  <span className={cn(
+                    "text-[10px] font-black px-1.5 py-0.5 rounded-full",
+                    isActive ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                  )}>
+                    {countByCategory(cat)}
+                  </span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          <Card className="bg-muted/50 rounded-[24px] border border-border shadow-sm">
-            <CardContent className="p-6 space-y-4">
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-foreground">Still stuck?</h4>
-                <p className="text-[11px] text-muted-foreground leading-relaxed font-medium">Open a support ticket and our team will get back to you.</p>
+          {/* Contact Card */}
+          <Card className="border-border bg-card shadow-sm">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                  <MessageCircle size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">Still stuck?</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">Our support team is ready to help you.</p>
+                </div>
               </div>
-              <button 
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs font-semibold h-8 gap-1.5"
                 onClick={() => navigate("/customer/support")}
-                className="w-full py-2.5 bg-card border border-border text-foreground rounded-lg text-[11px] font-bold hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-sm"
               >
-                Contact Support
-              </button>
+                <MessageCircle size={12} /> Contact Support
+              </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main FAQ Content */}
-        <div className="lg:col-span-3 space-y-4">
+        {/* ── FAQ Content ── */}
+        <div className="lg:col-span-3 space-y-3">
+          {/* Result count */}
+          {!isLoading && (
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs text-muted-foreground font-medium">
+                {filteredFaqs.length === 0
+                  ? "No articles found"
+                  : `${filteredFaqs.length} article${filteredFaqs.length !== 1 ? "s" : ""}`}
+                {activeCategory !== "All" && <span className="ml-1">in <strong>{activeCategory}</strong></span>}
+              </p>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="h-64 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
-              <p className="text-muted-foreground font-bold uppercase text-[9px] tracking-widest">Loading...</p>
+              <Loader2 className="w-8 h-8 animate-spin text-primary/30" />
+              <p className="text-xs text-muted-foreground">Loading articles...</p>
             </div>
           ) : filteredFaqs.length === 0 ? (
-            <div className="text-center py-16 bg-muted/30 rounded-[24px] border border-dashed border-border">
-              <p className="text-muted-foreground text-sm font-bold">No results found.</p>
+            <div className="py-16 flex flex-col items-center justify-center text-center border-2 border-dashed border-border rounded-2xl">
+              <BookOpen className="w-10 h-10 text-muted-foreground/30 mb-3" />
+              <p className="text-sm font-semibold text-foreground">No results found</p>
+              <p className="text-xs text-muted-foreground mt-1">Try a different search term or category</p>
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="mt-3 text-xs text-primary font-semibold hover:underline"
+                >
+                  Clear search
+                </button>
+              )}
             </div>
           ) : (
-            <Accordion type="single" collapsible className="space-y-3">
-              {filteredFaqs.map((faq) => (
-                <AccordionItem 
-                  key={faq.id} 
-                  value={`item-${faq.id}`}
-                  style={{ backgroundColor: getRowBg(faq.hexColor) }}
-                  className="bg-card border border-border rounded-[20px] shadow-sm hover:border-primary/30 transition-all px-1"
-                >
-                  <AccordionTrigger className="px-5 py-5 hover:no-underline group">
-                    <div className="flex items-center gap-4 text-left">
-                      <div 
-                        className="w-1 h-6 rounded-full" 
-                        style={{ backgroundColor: getAccentColor(faq.hexColor) }}
-                      />
-                      <span className="font-bold text-base text-foreground group-data-[state=open]:text-primary transition-colors">
-                        {faq.question}
-                      </span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-5 pb-6 pt-1">
-                    <div className="pl-5 pr-2 border-l border-border/50 ml-0.5">
-                      <div className="text-sm text-muted-foreground font-medium leading-relaxed">
-                        {faq.answer}
-                      </div>
-                      <div className="mt-4 flex items-center gap-2">
-                        <span className="px-2 py-0.5 bg-muted/50 text-muted-foreground rounded-md text-[9px] font-bold uppercase tracking-widest border border-border">
-                          {faq.category}
-                        </span>
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+            <motion.div layout>
+              <Accordion type="single" collapsible className="space-y-2">
+                <AnimatePresence>
+                  {filteredFaqs.map((faq, idx) => {
+                    const style = getCatStyle(faq.category);
+                    return (
+                      <motion.div
+                        key={faq.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.04 }}
+                      >
+                        <AccordionItem
+                          value={`item-${faq.id}`}
+                          className="bg-card border border-border rounded-xl shadow-sm hover:border-primary/30 hover:shadow-md transition-all overflow-hidden"
+                        >
+                          <AccordionTrigger className="px-5 py-4 hover:no-underline group [&>svg]:hidden">
+                            <div className="flex items-center gap-3 text-left w-full">
+                              <div className={cn("w-1 h-5 rounded-full flex-shrink-0", style.dot)} />
+                              <span className="font-semibold text-sm text-foreground group-data-[state=open]:text-primary transition-colors flex-1">
+                                {faq.question}
+                              </span>
+                              <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-5 pb-5 pt-0">
+                            <div className="pl-4 border-l-2 border-border ml-0.5 space-y-3">
+                              <p className="text-sm text-muted-foreground leading-relaxed">{faq.answer}</p>
+                              <div className="flex items-center gap-2">
+                                <Tag size={11} className="text-muted-foreground/50" />
+                                <span className={cn(
+                                  "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                                  style.bg, style.text
+                                )}>
+                                  {faq.category}
+                                </span>
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </Accordion>
+            </motion.div>
           )}
         </div>
       </div>
