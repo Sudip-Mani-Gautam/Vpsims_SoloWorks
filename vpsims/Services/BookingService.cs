@@ -29,7 +29,16 @@ namespace vpsims.Services
                 .Include(b => b.Vehicle)
                 .AsQueryable();
 
-            if (userId.HasValue) query = query.Where(b => b.UserId == userId.Value);
+            if (userId.HasValue)
+            {
+                var normalizedEmail = await _context.Users
+                    .Where(u => u.Id == userId.Value)
+                    .Select(u => u.Email.ToLower())
+                    .FirstOrDefaultAsync();
+
+                query = query.Where(b => b.UserId == userId.Value ||
+                    (normalizedEmail != null && b.User != null && b.User.Email.ToLower() == normalizedEmail));
+            }
             if (branchId.HasValue) query = query.Where(b => b.BranchId == branchId.Value);
 
             var bookings = await query.OrderByDescending(b => b.ServiceDate).ToListAsync();

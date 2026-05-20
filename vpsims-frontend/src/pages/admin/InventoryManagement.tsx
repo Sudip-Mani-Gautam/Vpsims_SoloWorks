@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -92,6 +93,7 @@ const InventoryManagement = () => {
     urgency: 'Medium'
   });
   const [importing, setImporting] = useState(false);
+  const queryClient = useQueryClient();
 
   const load = async () => {
     try {
@@ -217,6 +219,7 @@ const InventoryManagement = () => {
         urgency: importForm.urgency
       });
       toast.success("Inventory stock successfully imported from vendor.");
+      queryClient.invalidateQueries({ queryKey: ["purchase-invoices"] });
       setIsImportModalOpen(false);
       setImportForm({ supplierId: '', partId: '', quantity: '1', urgency: 'Medium' });
       load();

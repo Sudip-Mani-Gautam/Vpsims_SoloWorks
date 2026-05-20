@@ -155,6 +155,90 @@ namespace vpsims
                     Cron.Daily);
             }
 
+            // Database seeding for Categories and Suppliers (Real data)
+            using (var scope = app.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                if (!context.Categories.Any())
+                {
+                    context.Categories.AddRange(
+                        new Category { Name = "Engine Parts", Description = "Engine components" },
+                        new Category { Name = "Suspension", Description = "Suspension systems" },
+                        new Category { Name = "Electronics", Description = "Electronic parts" },
+                        new Category { Name = "Interior", Description = "Interior accessories" },
+                        new Category { Name = "Exterior", Description = "Exterior components" },
+                        new Category { Name = "Lighting", Description = "Lighting systems" },
+                        new Category { Name = "Safety", Description = "Safety gadgets" }
+                    );
+                    context.SaveChanges();
+                }
+                if (!context.Suppliers.Any())
+                {
+                    context.Suppliers.AddRange(
+                        new Supplier { Name = "TOYOTA VENDOR", ContactName = "Toyota Support", Phone = "9801234567", Email = "toyota@vpsims.com", Address = "Kathmandu, Nepal", Category = "Automotive", IsActive = true },
+                        new Supplier { Name = "HONDA VENDOR", ContactName = "Honda Support", Phone = "9801234568", Email = "honda@vpsims.com", Address = "Kathmandu, Nepal", Category = "Automotive", IsActive = true },
+                        new Supplier { Name = "HYUNDAI VENDOR", ContactName = "Hyundai Support", Phone = "9801234569", Email = "hyundai@vpsims.com", Address = "Kathmandu, Nepal", Category = "Automotive", IsActive = true },
+                        new Supplier { Name = "FORD VENDOR", ContactName = "Ford Support", Phone = "9801234570", Email = "ford@vpsims.com", Address = "Kathmandu, Nepal", Category = "Automotive", IsActive = true },
+                        new Supplier { Name = "BMW VENDOR", ContactName = "BMW Support", Phone = "9801234571", Email = "bmw@vpsims.com", Address = "Kathmandu, Nepal", Category = "Automotive", IsActive = true }
+                    );
+                    context.SaveChanges();
+                }
+                // Backfill purchase invoices from existing parts so the list reflects real inventory history
+                var hasPurchaseInvoices = context.PurchaseInvoices.Any();
+                var hasPurchaseInvoiceItems = context.PurchaseInvoiceItems.Any();
+
+                if (!hasPurchaseInvoices || !hasPurchaseInvoiceItems)
+                {
+                    if (hasPurchaseInvoices)
+                    {
+                        context.PurchaseInvoiceItems.RemoveRange(context.PurchaseInvoiceItems);
+                        context.PurchaseInvoices.RemoveRange(context.PurchaseInvoices);
+                        context.SaveChanges();
+                    }
+
+                    var supplierParts = context.Parts
+                        .Include(p => p.Supplier)
+                        .Where(p => p.SupplierId > 0)
+                        .ToList()
+                        .GroupBy(p => new { p.SupplierId, SupplierName = p.Supplier != null ? p.Supplier.Name : "Unknown" })
+                        .ToList();
+
+                    var backfillIndex = 0;
+
+                    foreach (var supplierGroup in supplierParts)
+                    {
+                        var partCount = supplierGroup.Count();
+                        if (partCount == 0) continue;
+
+                        var totalAmount = supplierGroup.Sum(part => part.CostPrice * Math.Max(part.StockQuantity, 1));
+                        var itemsCount = supplierGroup.Sum(part => Math.Max(part.StockQuantity, 1));
+
+                        var invoice = new vpsims.Models.PurchaseInvoice
+                        {
+                            SupplierId = supplierGroup.Key.SupplierId,
+                            TotalAmount = totalAmount,
+                            Status = "Completed",
+                            PurchaseDate = DateTime.UtcNow.AddDays(-(backfillIndex * 2)),
+                            ItemsCount = itemsCount,
+                            Items = new List<vpsims.Models.PurchaseInvoiceItem>
+                            {
+                                new vpsims.Models.PurchaseInvoiceItem
+                                {
+                                    PartName = $"Backfill purchase summary ({partCount} parts)",
+                                    Quantity = itemsCount,
+                                    UnitPrice = partCount > 0 ? totalAmount / itemsCount : 0m
+                                }
+                            }
+                        };
+
+                        context.PurchaseInvoices.Add(invoice);
+                        backfillIndex++;
+                    }
+
+                    context.SaveChanges();
+                }
+            }
+
             app.MapControllers();
 
             app.Run();

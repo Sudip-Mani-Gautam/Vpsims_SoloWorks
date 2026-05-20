@@ -8,6 +8,7 @@ namespace vpsims.Models
         public string PasswordHash { get; set; } = string.Empty;
         public string Role { get; set; } = "Customer"; // Admin, Staff, Customer
         public string? Phone { get; set; }
+        public string? Branch { get; set; }
         public string? Address { get; set; }
         public int LoyaltyPoints { get; set; } = 0;
         public bool IsActive { get; set; } = true;

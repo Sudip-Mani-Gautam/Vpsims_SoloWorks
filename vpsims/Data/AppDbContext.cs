@@ -27,6 +27,8 @@ namespace vpsims.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<BusinessPaymentDetail> BusinessPaymentDetails { get; set; }
         public DbSet<PaymentSubmission> PaymentSubmissions { get; set; }
+        public DbSet<PurchaseInvoice> PurchaseInvoices { get; set; }
+        public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems { get; set; }
         public DbSet<FAQ> FAQs { get; set; }
         public DbSet<SupportTicket> SupportTickets { get; set; }
         public DbSet<SupportMessage> SupportMessages { get; set; }
@@ -178,6 +180,20 @@ namespace vpsims.Data
 
             modelBuilder.Entity<PaymentSubmission>()
                 .Property(p => p.AmountPaid)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<PurchaseInvoice>()
+                .ToTable("purchase_invoices");
+
+            modelBuilder.Entity<PurchaseInvoiceItem>()
+                .ToTable("purchase_invoice_items");
+
+            modelBuilder.Entity<PurchaseInvoice>()
+                .Property(p => p.TotalAmount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<PurchaseInvoiceItem>()
+                .Property(pi => pi.UnitPrice)
                 .HasColumnType("decimal(18,2)");
 
             // Support Ticket Relationships

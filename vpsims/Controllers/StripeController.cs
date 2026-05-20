@@ -28,11 +28,21 @@ namespace vpsims.Controllers
         [HttpPost("create-session")]
         public async Task<IActionResult> CreateSession([FromBody] CreateSessionRequest request)
         {
-            var order = await _context.Orders.FindAsync(request.OrderId);
-            if (order == null) return NotFound("Order not found.");
-
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            if (order.UserId != userId) return Forbid();
+            var normalizedEmail = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email.ToLower())
+                .FirstOrDefaultAsync();
+
+            var order = await _context.Orders
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == request.OrderId);
+            if (order == null) return NotFound("Order not found.");
+            if (order.UserId != userId &&
+                (normalizedEmail == null || order.User == null || order.User.Email.ToLower() != normalizedEmail))
+            {
+                return Forbid();
+            }
 
             var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? "customer@vpsims.com";
             
@@ -48,6 +58,12 @@ namespace vpsims.Controllers
         [HttpPost("verify-payment")]
         public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentRequest request)
         {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var normalizedEmail = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email.ToLower())
+                .FirstOrDefaultAsync();
+
             var isPaid = await _stripeService.VerifyPaymentAsync(request.SessionId);
             if (!isPaid) return BadRequest("Payment not completed.");
 
@@ -63,8 +79,15 @@ namespace vpsims.Controllers
             // To be robust, let's fetch session details again if needed, but for now we'll trust the client flow 
             // since this is a test environment.
             
-            var order = await _context.Orders.FindAsync(request.OrderId);
+            var order = await _context.Orders
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == request.OrderId);
             if (order == null) return NotFound();
+            if (order.UserId != userId &&
+                (normalizedEmail == null || order.User == null || order.User.Email.ToLower() != normalizedEmail))
+            {
+                return Forbid();
+            }
 
             var submission = new PaymentSubmission
             {

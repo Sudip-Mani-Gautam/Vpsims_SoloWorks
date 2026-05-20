@@ -128,34 +128,64 @@ namespace vpsims.Controllers
             return $"{span.Days} days ago";
         }
 
+        private static string GetServiceName(string? serviceNotes)
+        {
+            if (string.IsNullOrWhiteSpace(serviceNotes)) return "General Service Check";
+
+            var lines = serviceNotes.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var serviceLine = lines.FirstOrDefault(line => line.StartsWith("Service:", StringComparison.OrdinalIgnoreCase));
+
+            return serviceLine?.Replace("Service:", "", StringComparison.OrdinalIgnoreCase).Trim()
+                ?? lines.FirstOrDefault()?.Trim()
+                ?? "General Service Check";
+        }
+
         [HttpGet("customer-stats/{userId}")]
         public async Task<IActionResult> GetCustomerStats(int userId)
         {
-            var totalPurchases = await _context.Orders.CountAsync(o => o.UserId == userId);
-            var totalSpent = await _context.Orders
-                .Where(o => o.UserId == userId && o.PaymentStatus == "Paid")
-                .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
-            var appointmentsCount = await _context.Bookings
-                .CountAsync(b => b.UserId == userId && (b.Status == "Pending" || b.Status == "Approved"));
-            var reviewsCount = await _context.Reviews.CountAsync(r => r.UserId == userId);
-
-            var upcomingBooking = await _context.Bookings
-                .Include(b => b.Branch)
-                .Include(b => b.Vehicle)
-                .Where(b => b.UserId == userId && b.ServiceDate >= DateTime.UtcNow && (b.Status == "Pending" || b.Status == "Approved"))
-                .OrderBy(b => b.ServiceDate)
-                .Select(b => new {
-                    b.Id,
-                    ServiceType = b.ServiceNotes ?? "General Service Check",
-                    ServiceDate = b.ServiceDate,
-                    TimeSlot = b.TimeSlot,
-                    BranchName = b.Branch.Name,
-                    Vehicle = b.Vehicle != null ? $"{b.Vehicle.Make} {b.Vehicle.Model} {b.Vehicle.Year} ({b.Vehicle.LicensePlate})" : "N/A"
-                })
+            var normalizedEmail = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email.ToLower())
                 .FirstOrDefaultAsync();
 
+            var customerUserIds = await _context.Users
+                .Where(u => u.Id == userId || (normalizedEmail != null && u.Email.ToLower() == normalizedEmail))
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            if (customerUserIds.Count == 0)
+            {
+                customerUserIds.Add(userId);
+            }
+
+            var totalPurchases = await _context.Orders.CountAsync(o => customerUserIds.Contains(o.UserId));
+            var totalSpent = await _context.Orders
+                .Where(o => customerUserIds.Contains(o.UserId) && o.PaymentStatus == "Paid")
+                .SumAsync(o => (decimal?)o.TotalAmount) ?? 0;
+            var appointmentsCount = await _context.Bookings
+                .CountAsync(b => customerUserIds.Contains(b.UserId) && (b.Status == "Pending" || b.Status == "Approved"));
+            var reviewsCount = await _context.Reviews.CountAsync(r => customerUserIds.Contains(r.UserId));
+
+            var upcomingBookingEntity = await _context.Bookings
+                .Include(b => b.Branch)
+                .Include(b => b.Vehicle)
+                .Where(b => customerUserIds.Contains(b.UserId) && b.ServiceDate >= DateTime.UtcNow && (b.Status == "Pending" || b.Status == "Approved"))
+                .OrderBy(b => b.ServiceDate)
+                .FirstOrDefaultAsync();
+
+            var upcomingBooking = upcomingBookingEntity == null ? null : new {
+                upcomingBookingEntity.Id,
+                ServiceType = GetServiceName(upcomingBookingEntity.ServiceNotes),
+                ServiceDate = upcomingBookingEntity.ServiceDate,
+                TimeSlot = upcomingBookingEntity.TimeSlot,
+                BranchName = upcomingBookingEntity.Branch.Name,
+                Vehicle = upcomingBookingEntity.Vehicle != null
+                    ? $"{upcomingBookingEntity.Vehicle.Make} {upcomingBookingEntity.Vehicle.Model} {upcomingBookingEntity.Vehicle.Year} ({upcomingBookingEntity.Vehicle.LicensePlate})"
+                    : "N/A"
+            };
+
             var recentNotifications = await _context.Notifications
-                .Where(n => n.UserId == userId)
+                .Where(n => customerUserIds.Contains(n.UserId))
                 .OrderByDescending(n => n.CreatedAt)
                 .Take(3)
                 .Select(n => new {

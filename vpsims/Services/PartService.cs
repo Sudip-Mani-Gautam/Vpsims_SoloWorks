@@ -258,6 +258,30 @@ namespace vpsims.Services
             if (part == null) return null;
 
             part.StockQuantity += quantity;
+
+            if (part.SupplierId > 0)
+            {
+                var totalAmount = part.CostPrice * quantity;
+                var purchaseInvoice = new PurchaseInvoice
+                {
+                    SupplierId = part.SupplierId,
+                    TotalAmount = totalAmount,
+                    Status = "Completed",
+                    PurchaseDate = DateTime.UtcNow,
+                    ItemsCount = quantity
+                };
+
+                purchaseInvoice.Items.Add(new PurchaseInvoiceItem
+                {
+                    PartId = part.Id,
+                    PartName = part.Name,
+                    Quantity = quantity,
+                    UnitPrice = part.CostPrice
+                });
+
+                _context.PurchaseInvoices.Add(purchaseInvoice);
+            }
+
             await _context.SaveChangesAsync();
 
             await _activityLogService.LogAsync(userId, "STOCK_IMPORTED", $"Imported {quantity} units of '{part.Name}' (SKU: {part.SKU}) from vendor '{part.Supplier?.Name}' with {urgency} priority. New stock: {part.StockQuantity}.");

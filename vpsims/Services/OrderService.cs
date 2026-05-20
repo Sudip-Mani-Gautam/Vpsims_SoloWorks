@@ -59,8 +59,19 @@ namespace vpsims.Services
         public async Task<IEnumerable<OrderDto>> GetAllAsync() =>
             (await WithIncludes().OrderByDescending(o => o.CreatedAt).ToListAsync()).Select(ToDto);
 
-        public async Task<IEnumerable<OrderDto>> GetByUserAsync(int userId) =>
-            (await WithIncludes().Where(o => o.UserId == userId).OrderByDescending(o => o.CreatedAt).ToListAsync()).Select(ToDto);
+        public async Task<IEnumerable<OrderDto>> GetByUserAsync(int userId)
+        {
+            var normalizedEmail = await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email.ToLower())
+                .FirstOrDefaultAsync();
+
+            return (await WithIncludes()
+                .Where(o => o.UserId == userId ||
+                    (normalizedEmail != null && o.User != null && o.User.Email.ToLower() == normalizedEmail))
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync()).Select(ToDto);
+        }
 
         public async Task<OrderDto?> GetByIdAsync(int id)
         {

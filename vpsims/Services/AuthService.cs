@@ -25,13 +25,17 @@ namespace vpsims.Services
 
         public async Task<AuthResponseDto?> RegisterAsync(RegisterDto dto)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+            var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
+            if (await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail))
                 return null;
 
             var user = new User
             {
                 Name = dto.Name,
-                Email = dto.Email,
+                Email = normalizedEmail,
+                Phone = dto.Phone,
+                Branch = dto.Branch,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = dto.Role,
                 CreatedAt = DateTime.UtcNow
@@ -72,7 +76,10 @@ namespace vpsims.Services
 
         public async Task<AuthResponseDto?> LoginAsync(LoginDto dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            var email = dto.Email.Trim();
+            var normalizedEmail = email.ToLowerInvariant();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email)
+                ?? await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
             if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
                 return null;
 

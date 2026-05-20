@@ -119,6 +119,14 @@ namespace vpsims.Services
 
         // --- Payment Submissions ---
 
+        private async Task<string?> GetNormalizedUserEmailAsync(int userId)
+        {
+            return await _context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.Email.ToLower())
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<IEnumerable<PaymentSubmissionDto>> GetAllSubmissionsAsync()
         {
             return await _context.PaymentSubmissions
@@ -146,9 +154,12 @@ namespace vpsims.Services
 
         public async Task<IEnumerable<PaymentSubmissionDto>> GetSubmissionsByUserIdAsync(int userId)
         {
+            var normalizedEmail = await GetNormalizedUserEmailAsync(userId);
+
             return await _context.PaymentSubmissions
                 .Include(p => p.User)
-                .Where(p => p.UserId == userId)
+                .Where(p => p.UserId == userId ||
+                    (normalizedEmail != null && p.User != null && p.User.Email.ToLower() == normalizedEmail))
                 .Select(p => new PaymentSubmissionDto
                 {
                     Id = p.Id,
@@ -200,7 +211,12 @@ namespace vpsims.Services
         public async Task<PaymentSubmissionDto?> CreateSubmissionAsync(int userId, CreatePaymentSubmissionDto dto)
         {
             // Verify order exists and belongs to user
-            var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == dto.OrderId && o.UserId == userId);
+            var normalizedEmail = await GetNormalizedUserEmailAsync(userId);
+            var order = await _context.Orders
+                .Include(o => o.User)
+                .FirstOrDefaultAsync(o => o.Id == dto.OrderId &&
+                    (o.UserId == userId ||
+                        (normalizedEmail != null && o.User != null && o.User.Email.ToLower() == normalizedEmail)));
             if (order == null) throw new Exception("Order not found or access denied.");
 
             var submission = new PaymentSubmission

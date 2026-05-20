@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using vpsims.Data;
@@ -11,9 +12,11 @@ using vpsims.Data;
 namespace vpsims.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260520025118_AddUserBranch")]
+    partial class AddUserBranch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -253,7 +256,7 @@ namespace vpsims.Migrations
                             Id = 1,
                             Answer = "Navigate to the 'Book Appointment' section from your dashboard, select your vehicle, choose a service type and date, and submit. You will receive a notification once our staff approves it.",
                             Category = "Bookings",
-                            CreatedAt = new DateTime(2026, 5, 20, 3, 14, 53, 293, DateTimeKind.Utc).AddTicks(2476),
+                            CreatedAt = new DateTime(2026, 5, 20, 2, 51, 16, 392, DateTimeKind.Utc).AddTicks(1914),
                             DisplayOrder = 1,
                             HexColor = "Purple",
                             IsPublished = true,
@@ -264,7 +267,7 @@ namespace vpsims.Migrations
                             Id = 2,
                             Answer = "For every purchase and service completed, you earn loyalty points. These points can be redeemed for discounts on future parts or services. You can view your balance in your profile.",
                             Category = "Rewards",
-                            CreatedAt = new DateTime(2026, 5, 20, 3, 14, 53, 293, DateTimeKind.Utc).AddTicks(3573),
+                            CreatedAt = new DateTime(2026, 5, 20, 2, 51, 16, 392, DateTimeKind.Utc).AddTicks(3325),
                             DisplayOrder = 2,
                             HexColor = "Yellow",
                             IsPublished = true,
@@ -275,7 +278,7 @@ namespace vpsims.Migrations
                             Id = 3,
                             Answer = "Use the 'Request Parts' feature. Provide the part name, description, and your vehicle details. Our procurement team will find it for you and provide a quote.",
                             Category = "Parts",
-                            CreatedAt = new DateTime(2026, 5, 20, 3, 14, 53, 293, DateTimeKind.Utc).AddTicks(3575),
+                            CreatedAt = new DateTime(2026, 5, 20, 2, 51, 16, 392, DateTimeKind.Utc).AddTicks(3328),
                             DisplayOrder = 3,
                             HexColor = "Green",
                             IsPublished = true,
@@ -286,7 +289,7 @@ namespace vpsims.Migrations
                             Id = 4,
                             Answer = "Yes, all our genuine parts come with a manufacturer's warranty. The duration depends on the specific part and brand. Please keep your invoice for any warranty claims.",
                             Category = "Policies",
-                            CreatedAt = new DateTime(2026, 5, 20, 3, 14, 53, 293, DateTimeKind.Utc).AddTicks(3577),
+                            CreatedAt = new DateTime(2026, 5, 20, 2, 51, 16, 392, DateTimeKind.Utc).AddTicks(3329),
                             DisplayOrder = 4,
                             HexColor = "Red",
                             IsPublished = true,
@@ -602,67 +605,6 @@ namespace vpsims.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("payment_submissions", (string)null);
-                });
-
-            modelBuilder.Entity("vpsims.Models.PurchaseInvoice", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ItemsCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("PurchaseDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("SupplierId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SupplierId");
-
-                    b.ToTable("purchase_invoices", (string)null);
-                });
-
-            modelBuilder.Entity("vpsims.Models.PurchaseInvoiceItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("PartId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("PartName")
-                        .HasColumnType("text");
-
-                    b.Property<int>("PurchaseInvoiceId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PurchaseInvoiceId");
-
-                    b.ToTable("purchase_invoice_items", (string)null);
                 });
 
             modelBuilder.Entity("vpsims.Models.Review", b =>
@@ -1100,28 +1042,6 @@ namespace vpsims.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("vpsims.Models.PurchaseInvoice", b =>
-                {
-                    b.HasOne("vpsims.Models.Supplier", "Supplier")
-                        .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Supplier");
-                });
-
-            modelBuilder.Entity("vpsims.Models.PurchaseInvoiceItem", b =>
-                {
-                    b.HasOne("vpsims.Models.PurchaseInvoice", "PurchaseInvoice")
-                        .WithMany("Items")
-                        .HasForeignKey("PurchaseInvoiceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("PurchaseInvoice");
-                });
-
             modelBuilder.Entity("vpsims.Models.Review", b =>
                 {
                     b.HasOne("vpsims.Models.User", "User")
@@ -1212,11 +1132,6 @@ namespace vpsims.Migrations
             modelBuilder.Entity("vpsims.Models.Part", b =>
                 {
                     b.Navigation("OrderItems");
-                });
-
-            modelBuilder.Entity("vpsims.Models.PurchaseInvoice", b =>
-                {
-                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("vpsims.Models.Supplier", b =>

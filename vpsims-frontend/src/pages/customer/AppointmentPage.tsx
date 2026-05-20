@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, CheckCircle, Clock, ChevronLeft, ChevronRight, Car, Zap, Info, Users } from "lucide-react";
+import {
+  Calendar, CheckCircle, Clock, ChevronLeft, ChevronRight, Car, Zap, Info, Users,
+  Wrench, Disc3, Gauge, BatteryCharging, Cpu, CircleDot, Settings, Wind,
+  Cable, ShieldCheck, Thermometer, Droplets
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
@@ -21,14 +26,28 @@ const MAX_PER_SLOT = 5;
 
 const DAYS    = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const SERVICES = [
-  { value: "general",     label: "General Service",     icon: "🔧" },
-  { value: "brake",       label: "Brake Inspection",    icon: "🛞" },
-  { value: "oil",         label: "Oil Change",          icon: "🫙" },
-  { value: "tire",        label: "Tire Replacement",    icon: "⚙️" },
-  { value: "engine",      label: "Engine Diagnostics",  icon: "🔍" },
-  { value: "electrical",  label: "Electrical Check",    icon: "⚡" },
+const SERVICES: Array<{ value: string; label: string; icon: LucideIcon }> = [
+  { value: "general",      label: "General Service",        icon: Wrench },
+  { value: "maintenance",  label: "Scheduled Maintenance",  icon: Settings },
+  { value: "brake",        label: "Brake Inspection",       icon: Disc3 },
+  { value: "oil",          label: "Oil Change",             icon: Droplets },
+  { value: "tire",         label: "Tire Replacement",       icon: CircleDot },
+  { value: "alignment",    label: "Wheel Alignment",        icon: Gauge },
+  { value: "battery",      label: "Battery Service",        icon: BatteryCharging },
+  { value: "engine",       label: "Engine Diagnostics",     icon: Cpu },
+  { value: "transmission", label: "Transmission Service",   icon: Settings },
+  { value: "ac",           label: "AC & Heating Service",   icon: Thermometer },
+  { value: "electrical",   label: "Electrical Check",       icon: Cable },
+  { value: "suspension",   label: "Suspension Inspection",  icon: ShieldCheck },
+  { value: "leak",         label: "Fluid Leak Inspection",  icon: Droplets },
+  { value: "pretrip",      label: "Pre-Trip Inspection",    icon: Wind },
 ];
+
+const getServiceName = (serviceNotes?: string) => {
+  if (!serviceNotes) return "General Service";
+  const serviceLine = serviceNotes.split("\n").find(line => line.startsWith("Service:"));
+  return serviceLine?.replace("Service:", "").trim() || serviceNotes.split("\n")[0] || "General Service";
+};
 
 const AppointmentPage = () => {
   const today = new Date();
@@ -87,7 +106,9 @@ const AppointmentPage = () => {
         vehicleId: parseInt(selectedVehicleId),
         serviceDate: selectedDate,
         timeSlot: selectedSlot,
-        serviceNotes: `Service: ${selectedServiceName}\nNotes: ${notes}`
+        serviceNotes: notes.trim()
+          ? `Service: ${selectedServiceName}\nNotes: ${notes.trim()}`
+          : `Service: ${selectedServiceName}`
       });
       setBooked(true);
       refetchBookings();
@@ -149,7 +170,7 @@ const AppointmentPage = () => {
                       variant="outline"
                       size="sm"
                       className="font-semibold"
-                      onClick={() => { setBooked(false); setSelectedSlot(""); setSelectedDate(""); setSelectedVehicleId(""); setNotes(""); }}
+                      onClick={() => { setBooked(false); setSelectedSlot(""); setSelectedDate(""); setSelectedService(""); setSelectedVehicleId(""); setNotes(""); }}
                     >
                       Book Another Appointment
                     </Button>
@@ -165,11 +186,17 @@ const AppointmentPage = () => {
                             <SelectValue placeholder="Select a service..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl border-border shadow-xl">
-                            {SERVICES.map(s => (
-                              <SelectItem key={s.value} value={s.value} className="text-sm">
-                                <span className="mr-2">{s.icon}</span> {s.label}
-                              </SelectItem>
-                            ))}
+                            {SERVICES.map(s => {
+                              const Icon = s.icon;
+                              return (
+                                <SelectItem key={s.value} value={s.value} className="text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <Icon size={14} className="text-muted-foreground" />
+                                    <span>{s.label}</span>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
                           </SelectContent>
                         </Select>
                       </div>
@@ -358,7 +385,7 @@ const AppointmentPage = () => {
               ) : (
                 <div className="divide-y divide-border">
                   {myBookings.map((apt: any) => {
-                    const serviceName = apt.serviceNotes?.split('\n')[0]?.replace('Service: ', '') || 'General Service';
+                    const serviceName = getServiceName(apt.serviceNotes);
                     return (
                     <div key={apt.id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
                       <div className="flex items-start justify-between gap-3">

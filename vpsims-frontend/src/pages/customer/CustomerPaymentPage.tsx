@@ -83,21 +83,36 @@ const CustomerPaymentPage = () => {
     setLoadingDetails(true);
     setLoadingHistory(true);
     setLoadingOrders(true);
+
+    // Fetch orders first so Pending Invoices are shown even if other endpoints fail
     try {
-      const [dRes, hRes, oRes] = await Promise.all([
-        api.get('/payment/details'),
-        api.get('/payment/submissions/my'),
-        api.get('/order/my')
-      ]);
-      setDetails(dRes.data.filter((d: BusinessPaymentDetail) => d.isActive));
-      setHistory(hRes.data);
+      const oRes = await api.get('/order/my');
       setOrders(oRes.data);
-    } catch { toast.error('Failed to sync payment data.'); }
-    finally {
-      setLoadingDetails(false);
-      setLoadingHistory(false);
+    } catch (err: any) {
+      // If unauthorized or other error, show a focused message
+      if (err.response?.status === 401) toast.error('Please login to view your invoices.');
+      else toast.error('Failed to load your orders.');
+      setOrders([]);
+    } finally {
       setLoadingOrders(false);
     }
+
+    // Fetch payment details and history independently
+    try {
+      const dRes = await api.get('/payment/details');
+      setDetails(dRes.data.filter((d: BusinessPaymentDetail) => d.isActive));
+    } catch {
+      toast.error('Failed to load payment methods.');
+      setDetails([]);
+    } finally { setLoadingDetails(false); }
+
+    try {
+      const hRes = await api.get('/payment/submissions/my');
+      setHistory(hRes.data);
+    } catch {
+      toast.error('Failed to load payment history.');
+      setHistory([]);
+    } finally { setLoadingHistory(false); }
   };
 
   useEffect(() => { fetchData(); }, []);

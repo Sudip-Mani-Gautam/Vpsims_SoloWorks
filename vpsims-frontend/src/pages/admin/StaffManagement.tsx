@@ -31,7 +31,7 @@ const initialStaff: Staff[] = [
   { id: "3", name: "Hari Basnet",  email: "hari@vpsims.com", phone: "9812345678", role: "Senior Sales",       branch: "Pokhara",    joinDate: "2023-11-10", status: "Active" },
 ];
 
-const ROLES   = ["Sales Associate", "Senior Sales", "Inventory Manager", "Customer Service", "Mechanic", "Accountant"];
+const ROLES   = ["Staff", "Sales Associate", "Senior Sales", "Inventory Manager", "Customer Service", "Mechanic", "Accountant"];
 const BRANCHES = ["Kathmandu", "Pokhara", "Lalitpur", "Bhaktapur", "Biratnagar"];
 
 const defaultForm = { name: "", email: "", phone: "", role: "", branch: "", password: "" };
@@ -116,6 +116,8 @@ const StaffManagement = () => {
     mutationFn: (data: typeof defaultForm) => api.post('/auth/register', { 
       name: data.name, 
       email: data.email, 
+      phone: data.phone,
+      branch: data.branch,
       password: data.password, 
       role: "Staff" 
     }),
@@ -421,7 +423,7 @@ const StaffManagement = () => {
                 <TableHeader>
                   <TableRow className="bg-muted/30 h-9">
                     <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pl-4 py-0">Name</TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-0">Contact</TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-0 min-w-[220px]">Contact</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-0">Role</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-0">Branch</TableHead>
                     <TableHead className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground py-0">Joined</TableHead>
@@ -466,10 +468,18 @@ const StaffManagement = () => {
               ) : filtered.map((s) => (
                 <TableRow key={s.id} className="hover:bg-muted/30 transition-colors h-11">
                   <TableCell className="pl-4 py-0 font-semibold text-sm text-foreground">{s.name}</TableCell>
-                  <TableCell className="py-0">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1 text-xs text-foreground"><Mail className="w-2.5 h-2.5 text-muted-foreground" />{s.email}</div>
-                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground"><Phone className="w-2.5 h-2.5" />{s.phone}</div>
+                  <TableCell className="py-0 min-w-[220px]">
+                    <div className="flex flex-col gap-1.5 leading-tight">
+                      <div className="flex items-center gap-2 text-xs text-foreground">
+                        <Mail className="w-3 h-3 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-muted-foreground">Email:</span>
+                        <span className="truncate">{s.email}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-foreground">
+                        <Phone className="w-3 h-3 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-muted-foreground">Phone:</span>
+                        <span className="truncate">{s.phone || 'N/A'}</span>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="py-0">

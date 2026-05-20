@@ -26,6 +26,7 @@ namespace vpsims.Controllers
                     u.Name,
                     u.Email,
                     u.Role,
+                    u.Branch,
                     u.IsActive,
                     u.CreatedAt,
                     u.Phone,
@@ -46,6 +47,8 @@ namespace vpsims.Controllers
                     id = u.Id,
                     name = u.Name,
                     email = u.Email,
+                    phone = u.Phone,
+                    branch = u.Branch,
                     role = u.Role,
                     isActive = u.IsActive,
                     createdAt = u.CreatedAt
@@ -92,6 +95,7 @@ namespace vpsims.Controllers
                 name = user.Name,
                 email = user.Email,
                 phone = user.Phone ?? "N/A",
+                branch = user.Branch ?? "N/A",
                 address = user.Address ?? "N/A",
                 role = user.Role,
                 loyaltyPoints = user.LoyaltyPoints,
@@ -182,15 +186,22 @@ namespace vpsims.Controllers
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
 
-            user.Name = dto.Name ?? user.Name;
-            user.Email = dto.Email ?? user.Email;
-            user.Phone = dto.Phone ?? user.Phone;
-            user.Role = dto.Role ?? user.Role;
-            // Note: We don't update branch here if it's not in the model, 
-            // but the User model doesn't have a Branch property. 
-            // If branch is needed, it might be a custom field or another table.
-            // For now, let's just update the core fields.
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+                var emailExists = await _context.Users
+                    .AnyAsync(u => u.Id != id && u.Email.ToLower() == normalizedEmail);
 
+                if (emailExists)
+                    return BadRequest(new { message = "A user with this email already exists." });
+
+                user.Email = normalizedEmail;
+            }
+
+            user.Name = dto.Name ?? user.Name;
+            user.Phone = dto.Phone ?? user.Phone;
+            user.Branch = dto.Branch ?? user.Branch;
+            user.Role = dto.Role ?? user.Role;
             await _context.SaveChangesAsync();
             return Ok(new { message = "User updated successfully" });
         }
